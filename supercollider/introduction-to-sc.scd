@@ -1,0 +1,21 @@
+s.options.numInputBusChannels = 0;
+s.boot;
+{ SinOsc.ar(440, 0, 0.8) }.play;
+s.quit;
+s.options.numInputBusChannels = 0;
+s.boot;
+ServerOptions.devices;
+s.options.outDevice = "MacBook Pro Speakers";
+s.options.numInputBusChannels = 0;
+s.boot;
+// Crear synth controlable
+x = { |freq=440, amp=0.3| SinOsc.ar(freq, 0, amp) }.play;
+s.options.outDevice;
+s.quit;
+s.options.outDevice = "WH-1000XM4";
+s.options.numInputBusChannels = 0;
+s.boot;
+{ SinOsc.ar(440, 0, 0.5) }.play;
+x = { |freq=440, amp=0.3| SinOsc.ar(freq, 0, amp) }.play;
+x.set(\freq, 660);
+x.set(\amp, 0.1);

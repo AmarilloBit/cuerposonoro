@@ -31,11 +31,35 @@ class FeatureExtractor:
             return self._empty_features()
 
         features = {
+            # === EXISTING FEATURES (SuperCollider) ===
             "energy": self._calculate_energy(landmarks, prev_landmarks),
             "symmetry": self._calculate_symmetry(landmarks),
             "smoothness": self._calculate_smoothness(landmarks, prev_landmarks),
             "armAngle": self._calculate_arm_angle(landmarks),
             "verticalExtension": self._calculate_vertical_extension(landmarks),
+
+            # === NEW FEATURES (MPE/MIDI) ===
+            # Chords - lower body
+            "feetCenterX": self._calculate_feet_center_x(landmarks),
+            "hipTilt": self._calculate_hip_tilt(landmarks),
+            "kneeAngle": self._calculate_knee_angle(landmarks),
+
+            # Melody - hands
+            "rightHandY": self._calculate_hand_y(landmarks, "right"),
+            "leftHandY": self._calculate_hand_y(landmarks, "left"),
+
+            # Melody - triggers and expression
+            "rightHandJerk": self._calculate_hand_jerk(landmarks, prev_landmarks, "right"),
+            "leftHandJerk": self._calculate_hand_jerk(landmarks, prev_landmarks, "left"),
+            "rightArmVelocity": self._calculate_arm_velocity(landmarks, prev_landmarks, "right"),
+            "leftArmVelocity": self._calculate_arm_velocity(landmarks, prev_landmarks, "left"),
+
+            # Melody - pitch bend / vibrato
+            "rightElbowHipAngle": self._calculate_elbow_hip_angle(landmarks, "right"),
+            "leftElbowHipAngle": self._calculate_elbow_hip_angle(landmarks, "left"),
+
+            # Global expression
+            "headTilt": self._calculate_head_tilt(landmarks),
         }
 
         # Apply temporal smoothing

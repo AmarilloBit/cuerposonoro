@@ -344,9 +344,23 @@ class FeatureExtractor:
     def _empty_features(self) -> dict:
         """Return default features when no valid pose detected."""
         return {
+            # Existing features
             "energy": 0.0,
             "symmetry": 0.0,
             "smoothness": 0.5,
             "armAngle": 0.0,
             "verticalExtension": 0.5,
+            # New MPE features
+            "feetCenterX": 0.5,
+            "hipTilt": 0.0,
+            "kneeAngle": 1.0,
+            "rightHandY": 0.5,
+            "leftHandY": 0.5,
+            "rightHandJerk": 0.0,
+            "leftHandJerk": 0.0,
+            "rightArmVelocity": 0.0,
+            "leftArmVelocity": 0.0,
+            "rightElbowHipAngle": 0.0,
+            "leftElbowHipAngle": 0.0,
+            "headTilt": 0.0,
         }

@@ -7,6 +7,7 @@ This file has been copy-pasted from the web demo version.
 import math
 from typing import Optional
 
+NO_SMOOTH = {"rightHandJerk", "leftHandJerk", "rightArmVelocity", "leftArmVelocity"}
 
 class FeatureExtractor:
     """Extracts musical features from MediaPipe pose landmarks."""
@@ -358,9 +359,12 @@ class FeatureExtractor:
 
         smoothed = {}
         for key, value in features.items():
-            prev_value = self.prev_features.get(key, value)
-            smoothed[key] = (self.smoothing_factor * value +
-                             (1 - self.smoothing_factor) * prev_value)
+            if key in NO_SMOOTH:
+                smoothed[key] = value  # pico: pasar sin suavizar
+            else:
+                prev_value = self.prev_features.get(key, value)
+                smoothed[key] = (self.smoothing_factor * value +
+                                 (1 - self.smoothing_factor) * prev_value)
 
         self.prev_features = smoothed.copy()
         return smoothed

@@ -514,6 +514,27 @@ class TestHandJerk:
         moved[16]["y"] += 0.5
         assert ext.calculate(moved, neutral)["rightHandJerk"] <= 1.0
 
+    def test_jerk_not_flattened_by_smoothing(self, ext, neutral):
+        """Jerk pico no debe quedar por debajo del umbral tras el suavizado temporal.
+
+        El suavizado aplana señales continuas, pero jerk es una señal de pico
+        que debe conservar su valor máximo para poder trigear notas.
+        """
+        # Calentar el extractor con un frame estático para establecer prev_features
+        ext.calculate(neutral, neutral)
+
+        # Movimiento brusco de muñeca (equivalente al que produce jerk ~0.5 sin suavizado)
+        moved = copy_landmarks(neutral)
+        moved[16]["x"] += 0.035  # muñeca derecha: desplazamiento que produce jerk ~0.52
+        moved[16]["y"] += 0.035
+
+        r = ext.calculate(moved, neutral)
+
+        # El jerk debe superar el umbral de trigger (0.4) incluso después del suavizado
+        assert r["rightHandJerk"] > 0.4, (
+            f"rightHandJerk={r['rightHandJerk']:.4f} no supera el umbral 0.4 "
+            f"— el suavizado está aplastando los picos de jerk"
+        )
 
 # Arm Velocity (Note Intensity & Duration)
 

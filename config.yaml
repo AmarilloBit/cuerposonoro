@@ -61,23 +61,12 @@ osc:
 
 # MIDI / MPE (Surge XT)
 
-midi:
+classical:
   port_name: "CuerpoSonoro"
-  jerk_threshold: 0.4       # Minimum hand jerk to trigger a melody note (classic mode)
+  jerk_threshold: 0.15       # Minimum hand jerk to trigger a melody note (classic mode)
   base_note_duration: 0.3   # Base note duration in seconds (classic mode)
   min_note_duration: 0.15
   max_note_duration: 0.6
-
-
-# Musical sender settings (only used when output.midi_mode: musical)
-
-musical:
-  tempo_bpm: 120            # Pulse grid. Notes snap to this tempo.
-  note_subdivision: 8       # 4=quarter notes, 8=eighth notes, 16=sixteenth notes
-  direction_threshold: 0.03 # Minimum hand dy to count as intentional movement
-  velocity_threshold: 0.4   # Arm velocity above this = fast = larger melodic jump
-  jump_size_slow: 1         # Chord tone positions to jump for slow movement
-  jump_size_fast: 2         # Chord tone positions to jump for fast movement
 
 
 # Audio Presets

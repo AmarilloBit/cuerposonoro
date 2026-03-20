@@ -66,7 +66,7 @@ class TensorRTPoseEstimator(BasePoseEstimator):
             if not os.path.exists(_ONNX_PATH):
                 raise FileNotFoundError(
                     f"ONNX model not found at {_ONNX_PATH}.\n"
-                    "Run first: python tools/convert_model.py"
+                    "Run first: python debug_tools/convert_model.py"
                 )
             print("[TensorRTBackend] Building TensorRT engine (first run, ~2-3 min)...")
             self._build_engine()

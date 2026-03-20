@@ -177,6 +177,8 @@ def main():
         overrides["output.mode"] = args.mode
     if args.midi_mode:
         overrides["output.midi_mode"] = args.midi_mode
+    if args.backend:
+        overrides["pose.backend"] = args.backend
 
     config = Config(overrides=overrides if overrides else None)
     print(f"[main] Config: {config.describe()}")
@@ -186,8 +188,6 @@ def main():
         print(f"[main] Source: webcam device {config.camera_device_id}")
     if args.debug:
         print("[main] Debug overlay: ON")
-    if args.backend:
-        overrides["pose.backend"] = args.backend
 
     # --- Pipeline components ---
     try:

@@ -266,6 +266,11 @@ class InstrumentedMusicalSender:
         elif dy < -self.direction_threshold:
             direction = -1
         else:
+            # Register dy eve though it doesn't go above umbral
+            self._log("dy_sample",
+                      dy=round(dy, 5),
+                      hand_y=round(hand_y, 4),
+                      arm_velocity=round(arm_velocity, 4))
             return   # sin movimiento suficiente, sin nota
 
         chord_key = self.current_chord or "I"
@@ -300,7 +305,7 @@ FEATURE_KEYS = [
     "headTilt",
 ]
 
-JERK_THRESHOLD      = 0.4
+JERK_THRESHOLD      = 0.15  # Syncro with midi.jerk_threshold at config.yaml
 DIRECTION_THRESHOLD = 0.03
 VELOCITY_THRESHOLD  = 0.4
 
@@ -326,6 +331,11 @@ def analyze(source: str, midi_mode: str, output_dir: str):
     else:
         sender = InstrumentedClassicSender()
         sender.JERK_THRESHOLD = config.midi_jerk_threshold
+
+    # Syncro global umbrals
+    global JERK_THRESHOLD, DIRECTION_THRESHOLD
+    JERK_THRESHOLD      = config.midi_jerk_threshold
+    DIRECTION_THRESHOLD = config.musical_direction_threshold
 
     # Abrir vídeo (una sola pasada, sin loop)
     cap = cv2.VideoCapture(source)
@@ -548,7 +558,7 @@ def _parse_args():
                         choices=["classic", "musical"], default="classic",
                         help="Modo MIDI a analizar (default: classic)")
     parser.add_argument("--out", default=None,
-                        help="Carpeta de salida (default: debug_output/<nombre_video>/)")
+                        help="Carpeta de salida (default: debug_tools/debug_output/<nombre_video>/)")
     return parser.parse_args()
 
 
@@ -559,7 +569,7 @@ if __name__ == "__main__":
         output_dir = args.out
     else:
         video_stem = Path(args.source).stem
-        output_dir = os.path.join("debug_output", video_stem)
+        output_dir = os.path.join("debug_tools/debug_output", video_stem)
 
     analyze(
         source=args.source,

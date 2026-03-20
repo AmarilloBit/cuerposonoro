@@ -5,11 +5,9 @@ benchmarks/results/*/
 benchmarks/charts/*.png
 !benchmarks/results/.gitkeep
 !benchmarks/charts/.gitkeep
-# Benchmarks (datos generados)
-benchmarks/results/
-benchmarks/charts/
-!benchmarks/results/.gitkeep
-!benchmarks/charts/.gitkeep
+
+# Debug Tools
+debug_tools/debug_output/*
 
 # Python cache
 __pycache__/

@@ -430,7 +430,7 @@ class TestPipelineOSC:
 
     @patch("vision_processor.osc_sender.udp_client.SimpleUDPClient")
     def test_features_to_osc_full_pipeline(self, mock_udp):
-        """Landmarks → features → OSC messages (17 messages sent)."""
+        """Landmarks → features → OSC messages (19 messages sent)."""
         mock_client = MagicMock()
         mock_udp.return_value = mock_client
 
@@ -441,7 +441,7 @@ class TestPipelineOSC:
         features = extractor.calculate(neutral)
         sender.send_features(features)
 
-        assert mock_client.send_message.call_count == 17
+        assert mock_client.send_message.call_count == 19
 
     @patch("vision_processor.osc_sender.udp_client.SimpleUDPClient")
     def test_all_osc_addresses_have_motion_prefix(self, mock_udp):

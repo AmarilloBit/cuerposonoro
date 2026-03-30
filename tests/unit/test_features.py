@@ -116,12 +116,13 @@ class TestCalculateGeneral:
         "rightArmVelocity", "leftArmVelocity",
         "rightElbowHipAngle", "leftElbowHipAngle",
         "headTilt",
+        "pelvis_thrust", "spine_lean",
     }
 
     def test_returns_dict(self, ext, neutral):
         assert isinstance(ext.calculate(neutral), dict)
 
-    def test_returns_all_17_keys(self, ext, neutral):
+    def test_returns_all_19_keys(self, ext, neutral):
         assert set(ext.calculate(neutral).keys()) == self.ALL_KEYS
 
     def test_all_values_numeric(self, ext, neutral):
@@ -130,11 +131,11 @@ class TestCalculateGeneral:
 
     def test_none_returns_empty(self, ext):
         r = ext.calculate(None)
-        assert isinstance(r, dict) and len(r) == 17
+        assert isinstance(r, dict) and len(r) == 19
 
     def test_empty_list_returns_empty(self, ext):
         r = ext.calculate([])
-        assert isinstance(r, dict) and len(r) == 17
+        assert isinstance(r, dict) and len(r) == 19
 
     def test_32_landmarks_returns_empty(self, ext):
         r = ext.calculate([make_landmark()] * 32)
@@ -142,7 +143,7 @@ class TestCalculateGeneral:
 
     def test_33_landmarks_works(self, ext):
         r = ext.calculate([make_landmark()] * 33)
-        assert len(r) == 17
+        assert len(r) == 19
 
     def test_empty_features_defaults(self, ext):
         r = ext.calculate(None)
@@ -163,6 +164,8 @@ class TestCalculateGeneral:
         assert r["rightElbowHipAngle"] == 0.0
         assert r["leftElbowHipAngle"] == 0.0
         assert r["headTilt"] == 0.0
+        assert r["pelvis_thrust"] == 0.0
+        assert r["spine_lean"] == 0.0
 
 
 # Output range validation
@@ -175,7 +178,7 @@ RANGE_01 = [
     "rightArmVelocity", "leftArmVelocity",
     "rightElbowHipAngle", "leftElbowHipAngle",
 ]
-RANGE_SIGNED = ["symmetry", "hipTilt", "headTilt"]
+RANGE_SIGNED = ["symmetry", "hipTilt", "headTilt", "pelvis_thrust", "spine_lean"]
 
 
 class TestOutputRanges:
@@ -727,5 +730,123 @@ class TestEdgeCases:
                 y=random.uniform(0.0, 1.0),
             ) for _ in range(33)]
             r = ext.calculate(lm, prev)
-            assert isinstance(r, dict) and len(r) == 17
+            assert isinstance(r, dict) and len(r) == 19
             prev = lm
+
+
+# Pelvis Thrust (Blueprint chord navigation)
+
+class TestPelvisThrust:
+
+    def test_neutral_pose_near_zero(self, ext, neutral):
+        """Hips directly above ankles in neutral pose gives ~0."""
+        assert ext.calculate(neutral)["pelvis_thrust"] == pytest.approx(0.0, abs=0.15)
+
+    def test_hips_forward_positive(self, ext, neutral):
+        """Pushing hips forward (lower X in image coords) relative to ankles."""
+        lm = copy_landmarks(neutral)
+        # Move hips forward (decrease X) while ankles stay
+        lm[23]["x"] = 0.40
+        lm[24]["x"] = 0.30
+        assert ext.calculate(lm)["pelvis_thrust"] < 0.0  # hips behind ankles in X
+
+    def test_hips_behind_negative(self, ext, neutral):
+        """Hips behind ankles (higher X) gives positive value."""
+        lm = copy_landmarks(neutral)
+        lm[23]["x"] = 0.70
+        lm[24]["x"] = 0.60
+        assert ext.calculate(lm)["pelvis_thrust"] > 0.0
+
+    def test_normalised_by_torso_height(self, ext, neutral):
+        """Same hip displacement on a taller body gives smaller thrust value."""
+        short = copy_landmarks(neutral)
+        short[23]["x"] = 0.65  # hip shifted
+        short[24]["x"] = 0.55
+        short[11]["y"] = 0.50  # short torso
+        short[23]["y"] = 0.60
+
+        tall = copy_landmarks(neutral)
+        tall[23]["x"] = 0.65
+        tall[24]["x"] = 0.55
+        tall[11]["y"] = 0.20  # tall torso
+        tall[23]["y"] = 0.60
+
+        r_short = FeatureExtractor().calculate(short)["pelvis_thrust"]
+        r_tall = FeatureExtractor().calculate(tall)["pelvis_thrust"]
+        assert abs(r_short) > abs(r_tall)
+
+    def test_clamped(self, ext):
+        """Output stays within [-1, 1] even with extreme positions."""
+        lm = [make_landmark()] * 33
+        lm[23] = make_landmark(1.0, 0.60)  # hips far right
+        lm[24] = make_landmark(1.0, 0.60)
+        lm[27] = make_landmark(0.0, 0.90)  # ankles far left
+        lm[28] = make_landmark(0.0, 0.90)
+        lm[11] = make_landmark(0.5, 0.59)  # tiny torso (near zero height)
+        r = ext.calculate(lm)["pelvis_thrust"]
+        assert -1.0 <= r <= 1.0
+
+    def test_zero_torso_height_no_crash(self, ext):
+        """When shoulder and hip at same Y, no division by zero."""
+        lm = [make_landmark(0.5, 0.5)] * 33
+        r = ext.calculate(lm)["pelvis_thrust"]
+        assert isinstance(r, float)
+        assert -1.0 <= r <= 1.0
+
+
+# Spine Lean (Blueprint CC1 modulation)
+
+class TestSpineLean:
+
+    def test_neutral_pose_near_zero(self, ext, neutral):
+        """Shoulders directly above hips in neutral pose gives ~0."""
+        assert ext.calculate(neutral)["spine_lean"] == pytest.approx(0.0, abs=0.15)
+
+    def test_lean_forward_positive(self, ext, neutral):
+        """Shoulders forward (lower X) relative to hips gives negative value."""
+        lm = copy_landmarks(neutral)
+        lm[11]["x"] = 0.45  # shoulders move forward (lower X)
+        lm[12]["x"] = 0.25
+        assert ext.calculate(lm)["spine_lean"] < 0.0
+
+    def test_lean_backward_negative(self, ext, neutral):
+        """Shoulders behind hips (higher X) gives positive value."""
+        lm = copy_landmarks(neutral)
+        lm[11]["x"] = 0.75  # shoulders move backward (higher X)
+        lm[12]["x"] = 0.55
+        assert ext.calculate(lm)["spine_lean"] > 0.0
+
+    def test_normalised_by_torso_height(self, ext, neutral):
+        """Same shoulder displacement on a taller body gives smaller lean value."""
+        short = copy_landmarks(neutral)
+        short[11]["x"] = 0.70
+        short[12]["x"] = 0.50
+        short[11]["y"] = 0.50  # short torso
+        short[23]["y"] = 0.60
+
+        tall = copy_landmarks(neutral)
+        tall[11]["x"] = 0.70
+        tall[12]["x"] = 0.50
+        tall[11]["y"] = 0.20  # tall torso
+        tall[23]["y"] = 0.60
+
+        r_short = FeatureExtractor().calculate(short)["spine_lean"]
+        r_tall = FeatureExtractor().calculate(tall)["spine_lean"]
+        assert abs(r_short) > abs(r_tall)
+
+    def test_clamped(self, ext):
+        """Output stays within [-1, 1] even with extreme positions."""
+        lm = [make_landmark()] * 33
+        lm[11] = make_landmark(1.0, 0.30)  # shoulders far right
+        lm[12] = make_landmark(1.0, 0.30)
+        lm[23] = make_landmark(0.0, 0.29)  # hips far left, tiny torso
+        lm[24] = make_landmark(0.0, 0.60)
+        r = ext.calculate(lm)["spine_lean"]
+        assert -1.0 <= r <= 1.0
+
+    def test_zero_torso_height_no_crash(self, ext):
+        """When shoulder and hip at same Y, no division by zero."""
+        lm = [make_landmark(0.5, 0.5)] * 33
+        r = ext.calculate(lm)["spine_lean"]
+        assert isinstance(r, float)
+        assert -1.0 <= r <= 1.0

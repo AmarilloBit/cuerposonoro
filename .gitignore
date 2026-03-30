@@ -1,4 +1,5 @@
 .idea
+.claude
 venv
 # Benchmark data (generated, not tracked)
 benchmarks/results/*/
@@ -18,3 +19,6 @@ __pycache__/
 *.task
 *.tflite
 *.onnx
+
+# Assets
+assets/midi

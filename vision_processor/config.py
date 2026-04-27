@@ -265,6 +265,10 @@ class Config:
             {"mode": "midi", "send_mode": None, "name": "midi"},
         ])
 
+    @property
+    def benchmark_backends(self) -> list:
+        return self.get("benchmark.backends", [{"name": "cpu"}])
+
     # =========================================================================
     # Factory methods — create pipeline components from config
     # =========================================================================
@@ -490,7 +494,10 @@ class Config:
         Returns:
             Dict suitable for LatencyLogger(config=...).
         """
+        backend = self.get("pose.backend") or self._detect_backend()
+
         meta = {
+            "backend": backend,
             "camera_device_id": self.camera_device_id,
             "resolution": f"{self.camera_width}x{self.camera_height}",
             "pose_model_complexity": self.pose_model_complexity,

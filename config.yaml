@@ -134,3 +134,6 @@ benchmark:
     - { mode: osc,  send_mode: individual, name: "osc" }
     - { mode: osc,  send_mode: bundle,     name: "osc_bundle" }
     - { mode: midi, send_mode: ~,          name: "midi" }
+  backends:
+    - { name: "cpu" }
+    - { name: "metal" }

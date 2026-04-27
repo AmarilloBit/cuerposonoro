@@ -65,6 +65,7 @@ RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
 def build_session_name(camera_filter: str = None,
                        output_filter: str = None,
                        pose_filter: str = None,
+                       backend_filter: list[str] | None = None,
                        custom_name: str = None) -> str:
     """
     Generate a descriptive session folder name.
@@ -73,6 +74,8 @@ def build_session_name(camera_filter: str = None,
         No filters:                  2026-02-17_all
         --camera-profile c922:       2026-02-17_c922
         --pose full --output osc:    2026-02-17_full_osc
+        --backend metal:             2026-02-17_metal
+        --backend cpu metal:         2026-02-17_cpu-metal
         --session-name baseline:     2026-02-17_baseline
     """
     date = datetime.now().strftime("%Y-%m-%d")
@@ -81,6 +84,8 @@ def build_session_name(camera_filter: str = None,
         return f"{date}_{custom_name}"
 
     parts = []
+    if backend_filter:
+        parts.append("-".join(backend_filter))
     if camera_filter:
         parts.append(camera_filter)
     if pose_filter:
@@ -180,7 +185,8 @@ def run_preview(cap, pose_estimator, combo_name: str, timeout: int = 10):
 def generate_combinations(config: Config,
                           camera_filter: str = None,
                           output_filter: str = None,
-                          pose_filter: str = None) -> list[dict]:
+                          pose_filter: str = None,
+                          backend_filter: list[str] | None = None) -> list[dict]:
     """
     Generate all benchmark combinations from config.yaml.
 
@@ -191,6 +197,7 @@ def generate_combinations(config: Config,
     resolutions = config.benchmark_resolutions
     pose_models = config.benchmark_pose_models
     output_modes = config.benchmark_output_modes
+    backends = config.benchmark_backends
 
     # Apply filters
     if camera_filter:
@@ -199,48 +206,53 @@ def generate_combinations(config: Config,
         output_modes = [m for m in output_modes if output_filter in m["name"]]
     if pose_filter:
         pose_models = [p for p in pose_models if pose_filter in p["name"]]
+    if backend_filter:
+        backends = [b for b in backends if b["name"] in backend_filter]
 
     combinations = []
 
-    for cam_key, cam_profile in cameras.items():
-        for res in resolutions:
-            for pose in pose_models:
-                for output in output_modes:
-                    name = (
-                        f"{cam_key}_"
-                        f"{res['name']}_"
-                        f"{pose['name']}_"
-                        f"{output['name']}"
-                    )
+    for backend in backends:
+        for cam_key, cam_profile in cameras.items():
+            for res in resolutions:
+                for pose in pose_models:
+                    for output in output_modes:
+                        name = (
+                            f"{backend['name']}_"
+                            f"{cam_key}_"
+                            f"{res['name']}_"
+                            f"{pose['name']}_"
+                            f"{output['name']}"
+                        )
 
-                    combinations.append({
-                        "name": name,
-                        "camera_profile": cam_key,
-                        "camera_name": cam_profile.get("name", cam_key),
-                        "camera_device_id": cam_profile["device_id"],
-                        "width": res["width"],
-                        "height": res["height"],
-                        "resolution_name": res["name"],
-                        "model_complexity": pose["model_complexity"],
-                        "pose_name": pose["name"],
-                        "output_mode": output["mode"],
-                        "send_mode": output.get("send_mode"),
-                        "output_name": output["name"],
-                    })
+                        combinations.append({
+                            "name": name,
+                            "backend": backend["name"],
+                            "camera_profile": cam_key,
+                            "camera_name": cam_profile.get("name", cam_key),
+                            "camera_device_id": cam_profile["device_id"],
+                            "width": res["width"],
+                            "height": res["height"],
+                            "resolution_name": res["name"],
+                            "model_complexity": pose["model_complexity"],
+                            "pose_name": pose["name"],
+                            "output_mode": output["mode"],
+                            "send_mode": output.get("send_mode"),
+                            "output_name": output["name"],
+                        })
 
     return combinations
 
 
 def print_combination_table(combinations: list):
     """Print a formatted table of all combinations."""
-    print(f"\n  {'#':<4} {'Name':<32} {'Camera':<18} {'Res':<8} "
+    print(f"\n  {'#':<4} {'Name':<42} {'Backend':<8} {'Camera':<18} {'Res':<8} "
           f"{'Pose':<8} {'Output':<12}")
-    print("  " + "-" * 82)
+    print("  " + "-" * 102)
 
     for i, c in enumerate(combinations, 1):
-        print(f"  {i:<4} {c['name']:<32} {c['camera_name']:<18} "
-              f"{c['resolution_name']:<8} {c['pose_name']:<8} "
-              f"{c['output_name']:<12}")
+        print(f"  {i:<4} {c['name']:<42} {c['backend']:<8} "
+              f"{c['camera_name']:<18} {c['resolution_name']:<8} "
+              f"{c['pose_name']:<8} {c['output_name']:<12}")
 
 
 # =========================================================================
@@ -269,8 +281,9 @@ def run_single_benchmark(combo: dict, config: Config,
 
     print(f"\n{'=' * 60}")
     print(f"  BENCHMARK: {name}")
-    print(f"  {combo['camera_name']} | {combo['resolution_name']} | "
-          f"pose={combo['pose_name']} | output={combo['output_name']}")
+    print(f"  backend={combo['backend']} | {combo['camera_name']} | "
+          f"{combo['resolution_name']} | pose={combo['pose_name']} | "
+          f"output={combo['output_name']}")
     print(f"{'=' * 60}")
 
     # --- Build config for this combination ---
@@ -280,6 +293,7 @@ def run_single_benchmark(combo: dict, config: Config,
         camera__width=combo["width"],
         camera__height=combo["height"],
         pose__model_complexity=combo["model_complexity"],
+        pose__backend=combo["backend"],
         output__mode=combo["output_mode"],
     )
     if combo["send_mode"]:
@@ -411,12 +425,12 @@ def print_comparison(results: list[tuple[str, LatencyLogger]],
     if len(results) < 2:
         return
 
-    print(f"\n\n{'=' * 78}")
+    print(f"\n\n{'=' * 95}")
     print("  COMPARISON ACROSS ALL CONFIGURATIONS")
-    print(f"{'=' * 78}")
-    print(f"\n  {'Config':<32} {'Mean':>8} {'P50':>8} {'P95':>8} "
-          f"{'FPS':>7} {'<80ms':>7}")
-    print("  " + "-" * 72)
+    print(f"{'=' * 95}")
+    print(f"\n  {'Config':<42} {'Backend':<8} {'Mean':>8} {'P50':>8} "
+          f"{'P95':>8} {'FPS':>7} {'<80ms':>7}")
+    print("  " + "-" * 90)
 
     for name, logger in results:
         valid = [f for f in logger.frames if f.get("pose_detected", True)]
@@ -431,12 +445,13 @@ def print_comparison(results: list[tuple[str, LatencyLogger]],
         p95 = logger._percentile(totals, 95)
         fps_mean = statistics.mean(fps_vals) if fps_vals else 0
         under_80 = sum(1 for v in totals if v <= 80) / len(totals) * 100
+        backend = logger.config.get("backend", "?")
 
-        print(f"  {name:<32} {mean:>7.1f}ms {p50:>7.1f}ms "
+        print(f"  {name:<42} {backend:<8} {mean:>7.1f}ms {p50:>7.1f}ms "
               f"{p95:>7.1f}ms {fps_mean:>6.1f} {under_80:>6.1f}%")
 
     print(f"\n  Results saved in: {session_dir}")
-    print("=" * 78)
+    print("=" * 95)
 
 
 # =========================================================================
@@ -468,6 +483,16 @@ def main():
         help="Only test this pose model (e.g. 'lite', 'full', 'heavy')"
     )
     parser.add_argument(
+        "--backend",
+        type=str,
+        nargs="+",
+        default=None,
+        choices=["cpu", "metal", "tensorrt"],
+        help="Pose estimation backend(s) to benchmark "
+             "(e.g. --backend cpu metal). "
+             "Default: all backends listed in config.yaml.",
+    )
+    parser.add_argument(
         "--list", action="store_true",
         help="List all combinations without running"
     )
@@ -497,6 +522,7 @@ def main():
         camera_filter=args.camera_profile,
         output_filter=args.output,
         pose_filter=args.pose,
+        backend_filter=args.backend,
     )
 
     if not combinations:
@@ -508,6 +534,7 @@ def main():
         camera_filter=args.camera_profile,
         output_filter=args.output,
         pose_filter=args.pose,
+        backend_filter=args.backend,
         custom_name=args.session_name,
     )
     session_dir = ensure_unique_session(os.path.join(RESULTS_DIR, session_name))

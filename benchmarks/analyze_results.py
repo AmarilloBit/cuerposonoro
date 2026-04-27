@@ -131,6 +131,7 @@ def load_all_raw(session: str = None,
         df["timestamp"] = timestamp
 
         # Add metadata columns for grouping
+        df["backend"] = meta.get("backend", "?")
         df["camera"] = meta.get("camera_name", "unknown")
         df["resolution"] = meta.get("resolution", "unknown")
         df["pose_model"] = meta.get("pose_model_complexity", "?")
@@ -180,6 +181,7 @@ def build_summary(df: pd.DataFrame) -> pd.DataFrame:
         stats["pct_under_80ms"] = (group["total_ms"] <= 80).mean() * 100
 
         # Keep metadata from first row
+        stats["backend"] = group["backend"].iloc[0]
         stats["camera"] = group["camera"].iloc[0]
         stats["resolution"] = group["resolution"].iloc[0]
         stats["pose_model"] = group["pose_model"].iloc[0]
@@ -200,26 +202,26 @@ def build_summary(df: pd.DataFrame) -> pd.DataFrame:
 
 def print_comparison(summary: pd.DataFrame):
     """Print the main comparison table."""
-    print(f"\n{'=' * 110}")
+    print(f"\n{'=' * 120}")
     print("  BENCHMARK COMPARISON (sorted by mean latency)")
-    print(f"{'=' * 110}\n")
+    print(f"{'=' * 120}\n")
 
     show_session = summary["session"].nunique() > 1
 
-    header = (f"  {'Name':<32} {'Camera':<14} {'Res':<10} {'Pose':<6} "
-              f"{'Out':<6} {'Mean':>8} {'P50':>8} {'P95':>8} "
+    header = (f"  {'Name':<42} {'Backend':<8} {'Camera':<14} {'Res':<10} "
+              f"{'Pose':<6} {'Out':<6} {'Mean':>8} {'P50':>8} {'P95':>8} "
               f"{'FPS':>6} {'<80ms':>7} {'Det':>5}")
     if show_session:
         header += f" {'Session':<24}"
     print(header)
-    print("  " + "-" * (106 if show_session else 96))
+    print("  " + "-" * (116 if show_session else 106))
 
     pose_labels = {"0": "Lite", "1": "Full", "2": "Heavy"}
 
     for name, row in summary.iterrows():
         pose = pose_labels.get(str(row["pose_model"]), str(row["pose_model"]))
-        line = (f"  {name:<32} {row['camera']:<14} {row['resolution']:<10} "
-                f"{pose:<6} {row['output_mode']:<6} "
+        line = (f"  {name:<42} {row['backend']:<8} {row['camera']:<14} "
+                f"{row['resolution']:<10} {pose:<6} {row['output_mode']:<6} "
                 f"{row['total_ms_mean']:>7.1f}ms "
                 f"{row['total_ms_p50']:>7.1f}ms "
                 f"{row['total_ms_p95']:>7.1f}ms "
@@ -325,6 +327,21 @@ def print_findings(df: pd.DataFrame, summary: pd.DataFrame):
         for mode, mean in out_means.items():
             n = valid[valid["output_mode"] == mode]["benchmark"].nunique()
             print(f"    {mode}: {mean:.1f}ms  ({n} configs)")
+        print()
+
+    # Backend comparison
+    backend_means = valid.groupby("backend")["total_ms"].mean()
+    if len(backend_means) > 1:
+        print("  Backend comparison (mean total ms):")
+        for backend, mean in backend_means.items():
+            n = valid[valid["backend"] == backend]["benchmark"].nunique()
+            print(f"    {backend}: {mean:.1f}ms  ({n} configs)")
+        if "cpu" in backend_means.index and "metal" in backend_means.index:
+            diff_val = backend_means["metal"] - backend_means["cpu"]
+            print(f"    → Metal vs CPU: {diff_val:+.1f}ms")
+        if "cpu" in backend_means.index and "tensorrt" in backend_means.index:
+            diff_val = backend_means["tensorrt"] - backend_means["cpu"]
+            print(f"    → TensorRT vs CPU: {diff_val:+.1f}ms")
         print()
 
     # Bottleneck analysis

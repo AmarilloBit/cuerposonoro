@@ -305,7 +305,7 @@ FEATURE_KEYS = [
     "headTilt",
 ]
 
-JERK_THRESHOLD      = 0.15  # Syncro with midi.jerk_threshold at config.yaml
+JERK_THRESHOLD      = 0.4   # Aligned with classic.py and config.yaml (midi.jerk_threshold)
 DIRECTION_THRESHOLD = 0.03
 VELOCITY_THRESHOLD  = 0.4
 

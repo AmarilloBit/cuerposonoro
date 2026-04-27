@@ -1,7 +1,7 @@
 """
 Unit tests for vision_processor/features.py
 
-Tests all 17 feature extraction methods with synthetic landmark data.
+Tests all 19 feature extraction methods with synthetic landmark data.
 No camera or hardware required — runs entirely with mock data.
 
 Usage:

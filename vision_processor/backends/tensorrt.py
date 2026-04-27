@@ -11,11 +11,15 @@ This file is kept as a reference for future work, not as a working
 backend.
 """
 
+import logging
 import os
+
 import cv2
 import numpy as np
 
 from vision_processor.pose import BasePoseEstimator
+
+logger = logging.getLogger(__name__)
 
 _MODEL_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -62,11 +66,11 @@ class TensorRTPoseEstimator(BasePoseEstimator):
                     f"ONNX model not found at {_ONNX_PATH}.\n"
                     "Run first: python debug_tools/convert_model.py"
                 )
-            print("[TensorRTBackend] Building TensorRT engine (first run, ~2-3 min)...")
+            logger.info("Building TensorRT engine (first run, ~2-3 min)...")
             self._build_engine()
-            print("[TensorRTBackend] Engine built and cached.")
+            logger.info("Engine built and cached.")
 
-        print("[TensorRTBackend] Loading TensorRT engine...")
+        logger.info("Loading TensorRT engine...")
         self._engine, self._context = self._load_engine()
         self._allocate_buffers()
 
@@ -75,7 +79,7 @@ class TensorRTPoseEstimator(BasePoseEstimator):
         self._mp_drawing = mp.solutions.drawing_utils
         self._mp_drawing_styles = mp.solutions.drawing_styles
 
-        print("[PoseEstimator] Backend: TensorRT (Jetson GPU Ampere)")
+        logger.info("Backend: TensorRT (Jetson GPU Ampere)")
 
     def _build_engine(self):
         """Build TensorRT engine from ONNX model and save to disk."""
@@ -99,7 +103,7 @@ class TensorRTPoseEstimator(BasePoseEstimator):
         # FP16 enabled on Ampere and later
         if builder.platform_has_fast_fp16:
             config.set_flag(trt.BuilderFlag.FP16)
-            print("[TensorRTBackend] FP16 enabled.")
+            logger.info("FP16 enabled.")
 
         serialized = builder.build_serialized_network(network, config)
         with open(_ENGINE_PATH, "wb") as f:
@@ -237,4 +241,4 @@ class TensorRTPoseEstimator(BasePoseEstimator):
         """Release TensorRT and CUDA resources."""
         del self._context
         del self._engine
-        print("[PoseEstimator] TensorRT backend released.")
+        logger.info("TensorRT backend released.")

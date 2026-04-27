@@ -1,20 +1,14 @@
 """
 TensorRT backend for pose estimation on NVIDIA Jetson.
 
-Uses the BlazePose model converted to ONNX and compiled to a TensorRT engine,
-running inference directly on the Jetson Ampere GPU.
-Expected latency: ~15ms vs ~60ms on CPU.
+NOTE: This backend is a stub. Four separate GPU-acceleration paths were
+attempted (MediaPipe pip wheel with GPU delegate, ONNX Runtime CUDA,
+TFLite-to-ONNX conversion, TensorRT native TFLite parser) and all
+failed for the reasons documented in the memoir's appendix F. The
+production path on Jetson is MediaPipe on CPU with `jetson_clocks`.
 
-Since MediaPipe's pip wheel does not support GPU on Jetson (build flags issue),
-inference is handled directly through TensorRT + pycuda.
-
-Requirements:
-    - NVIDIA Jetson with JetPack 6+ (CUDA 12.6, TensorRT 10.3)
-    - pycuda: pip install pycuda
-    - Model: pose_model.onnx (converted from pose_landmarker_full.task)
-
-NOTE: The first run builds the TensorRT engine from the ONNX model (~2-3 min).
-      Subsequent runs load the cached engine directly from pose_engine.trt.
+This file is kept as a reference for future work, not as a working
+backend.
 """
 
 import os

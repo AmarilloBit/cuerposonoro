@@ -1,7 +1,13 @@
 """
 Feature extraction from pose landmarks.
-This is the simplified version for the web demo.
-This file has been copy-pasted from the web demo version.
+
+Computes 19 kinematic descriptors per frame from MediaPipe's 33
+landmarks: postural angles, velocities, jerks, body symmetry, vertical
+extension, hand position, head tilt, pelvis thrust and spine lean.
+
+All descriptors are exponentially smoothed (alpha = 0.3), except for
+jerk and arm-velocity descriptors which require their original peak
+values to be preserved for note-trigger logic (see NO_SMOOTH).
 """
 
 import math

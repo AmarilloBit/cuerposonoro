@@ -36,7 +36,8 @@ def _make_config(overrides=None):
         "midi_channel_bass": 6,
         "midi_channel_master": 0,
         "assets_path": ASSETS_PATH,
-        "arm_velocity_threshold": 0.25,
+        "arm_velocity_threshold": 0.08,
+        "melody_cooldown": 0.15,
         "melody_bend_scale": 4.0,
     }
     if overrides:
@@ -186,13 +187,26 @@ class TestMelody:
             assert sender._melody_note in chord.notes
 
     def test_melody_triggers_on_velocity(self, sender, mock_port):
-        """A note_on is sent when mean arm velocity exceeds threshold."""
+        """A note_on is sent when arm velocity exceeds threshold."""
         features = _neutral_features(
             rightArmVelocity=0.6,
             leftArmVelocity=0.6,
         )
         sender.update(features)
         # Check that at least one note_on was sent on the melody channel
+        calls = mock_port.send.call_args_list
+        melody_ch = sender._config["midi_channel_melody"]
+        note_ons = [c for c in calls if hasattr(c[0][0], 'type') and
+                    c[0][0].type == 'note_on' and c[0][0].channel == melody_ch]
+        assert len(note_ons) >= 1
+
+    def test_melody_triggers_with_single_arm(self, sender, mock_port):
+        """A single arm moving above threshold is enough to trigger melody."""
+        features = _neutral_features(
+            rightArmVelocity=0.15,
+            leftArmVelocity=0.0,
+        )
+        sender.update(features)
         calls = mock_port.send.call_args_list
         melody_ch = sender._config["midi_channel_melody"]
         note_ons = [c for c in calls if hasattr(c[0][0], 'type') and

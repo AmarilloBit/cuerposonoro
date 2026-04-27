@@ -16,6 +16,7 @@ from tkinter import filedialog, ttk
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_SCRIPT = os.path.join(ROOT_DIR, "main.py")
+CALIBRATE_SCRIPT = os.path.join(ROOT_DIR, "calibrate.py")
 ASSETS_MIDI = os.path.join(ROOT_DIR, "assets", "midi")
 
 MODES = ["osc", "midi"]
@@ -173,6 +174,60 @@ class LauncherApp:
         )
         row += 1
 
+        # -- Separator: Calibration -----------------------------------------
+        ttk.Separator(frame, orient="horizontal").grid(
+            row=row, column=0, columnspan=3, sticky="ew", pady=8,
+        )
+        row += 1
+
+        ttk.Label(frame, text="Calibration", font=("TkDefaultFont", 0, "bold")).grid(
+            row=row, column=0, columnspan=2, sticky="w", **pad,
+        )
+        row += 1
+
+        # Video list
+        ttk.Label(frame, text="Videos:").grid(row=row, column=0, sticky="nw", **pad)
+        cal_list_frame = ttk.Frame(frame)
+        cal_list_frame.grid(row=row, column=1, sticky="w", **pad)
+
+        self.cal_listbox = tk.Listbox(cal_list_frame, height=4, width=40, selectmode="extended")
+        self.cal_listbox.pack(side="left")
+
+        cal_btn_frame = ttk.Frame(cal_list_frame)
+        cal_btn_frame.pack(side="left", padx=(4, 0))
+        ttk.Button(cal_btn_frame, text="Add…", command=self._cal_add_videos, width=7).pack(pady=1)
+        ttk.Button(cal_btn_frame, text="Remove", command=self._cal_remove_videos, width=7).pack(pady=1)
+        row += 1
+
+        # Label selector
+        ttk.Label(frame, text="Label:").grid(row=row, column=0, sticky="w", **pad)
+        label_frame = ttk.Frame(frame)
+        label_frame.grid(row=row, column=1, sticky="w", **pad)
+        self.cal_label_var = tk.StringVar(value="full_body")
+        ttk.Combobox(
+            label_frame, textvariable=self.cal_label_var,
+            values=["still", "slow_arms", "fast_arms", "pelvis", "lean", "full_body"],
+            state="readonly", width=14,
+        ).pack(side="left")
+        ttk.Button(label_frame, text="Set label", command=self._cal_set_label, width=8).pack(
+            side="left", padx=(4, 0),
+        )
+        row += 1
+
+        # Apply checkbox + Run button
+        cal_run_frame = ttk.Frame(frame)
+        cal_run_frame.grid(row=row, column=0, columnspan=2, sticky="w", **pad)
+        self.cal_apply_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(cal_run_frame, text="Apply to config.yaml", variable=self.cal_apply_var).pack(
+            side="left",
+        )
+        self.cal_run_btn = ttk.Button(cal_run_frame, text="Run Calibration", command=self._cal_run)
+        self.cal_run_btn.pack(side="left", padx=(12, 0))
+        row += 1
+
+        # Internal: label mapping {path: label}
+        self._cal_labels: dict[str, str] = {}
+
         # -- Separator ------------------------------------------------------
         ttk.Separator(frame, orient="horizontal").grid(
             row=row, column=0, columnspan=3, sticky="ew", pady=8,
@@ -301,6 +356,61 @@ class LauncherApp:
             self._reset_buttons()
         else:
             self.root.after(500, self._poll_process)
+
+    # -- Calibration -------------------------------------------------------
+
+    def _cal_add_videos(self):
+        paths = filedialog.askopenfilenames(
+            title="Select calibration videos",
+            filetypes=[("Video files", "*.mp4 *.avi *.mov *.mkv"), ("All files", "*.*")],
+        )
+        for p in paths:
+            if p not in self._cal_labels:
+                label = self.cal_label_var.get()
+                self._cal_labels[p] = label
+                self.cal_listbox.insert("end", f"[{label}] {os.path.basename(p)}")
+
+    def _cal_remove_videos(self):
+        selected = list(self.cal_listbox.curselection())
+        paths = list(self._cal_labels.keys())
+        for idx in reversed(selected):
+            if idx < len(paths):
+                del self._cal_labels[paths[idx]]
+            self.cal_listbox.delete(idx)
+
+    def _cal_set_label(self):
+        selected = list(self.cal_listbox.curselection())
+        paths = list(self._cal_labels.keys())
+        new_label = self.cal_label_var.get()
+        for idx in selected:
+            if idx < len(paths):
+                path = paths[idx]
+                self._cal_labels[path] = new_label
+                self.cal_listbox.delete(idx)
+                self.cal_listbox.insert(idx, f"[{new_label}] {os.path.basename(path)}")
+
+    def _cal_run(self):
+        if not self._cal_labels:
+            return
+
+        cmd = [sys.executable, CALIBRATE_SCRIPT]
+
+        if self.cal_apply_var.get():
+            cmd.append("--apply")
+
+        for path, label in self._cal_labels.items():
+            cmd.extend(["--label", label, path])
+
+        self.cal_run_btn.configure(state="disabled")
+        self.process = subprocess.Popen(cmd, cwd=ROOT_DIR)
+        self._poll_calibration()
+
+    def _poll_calibration(self):
+        if self.process and self.process.poll() is not None:
+            self.cal_run_btn.configure(state="normal")
+            self.process = None
+        else:
+            self.root.after(500, self._poll_calibration)
 
     def _reset_buttons(self):
         self.launch_btn.configure(state="normal")

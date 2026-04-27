@@ -71,6 +71,7 @@ class BlueprintMidiSender(BaseMidiSender):
         # Melody state
         self._melody_note: int | None = None
         self._prev_right_hand_y: float | None = None
+        self._last_melody_trigger: float = 0.0
 
         # Bass state
         self._bass_note: int | None = None
@@ -162,13 +163,19 @@ class BlueprintMidiSender(BaseMidiSender):
     def _update_melody(self, features: dict):
         right_vel = features.get("rightArmVelocity", 0.0)
         left_vel = features.get("leftArmVelocity", 0.0)
-        mean_arm_velocity = (right_vel + left_vel) / 2
+        arm_velocity = max(right_vel, left_vel)
 
-        arm_threshold = self._config.get("arm_velocity_threshold", 0.25)
+        arm_threshold = self._config.get("arm_velocity_threshold", 0.08)
+        melody_cooldown = self._config.get("melody_cooldown", 0.15)
         melody_ch = self._config.get("midi_channel_melody", 5)
 
-        if mean_arm_velocity <= arm_threshold:
+        if arm_velocity <= arm_threshold:
             return
+
+        now = time.time()
+        if (now - self._last_melody_trigger) < melody_cooldown:
+            return
+        self._last_melody_trigger = now
 
         # Note selection from active chord
         chord = self._progression.chords[self._chord_index]
@@ -185,7 +192,7 @@ class BlueprintMidiSender(BaseMidiSender):
         target_note = chord.notes[note_index]
 
         # Attack velocity
-        velocity = int(40 + mean_arm_velocity * 87)
+        velocity = int(40 + arm_velocity * 87)
         velocity = max(1, min(127, velocity))
 
         # Per-note pitch bend (right wrist vertical delta)

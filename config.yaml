@@ -58,7 +58,8 @@ output:
     midi_channel_bass: 6         # MPE channel for bass (0-indexed)
     midi_channel_master: 0       # MPE master channel (0-indexed)
     assets_path: "assets/midi"   # path to Unison MIDI Blueprint library
-    arm_velocity_threshold: 0.25 # mean arm velocity to trigger melody note
+    arm_velocity_threshold: 0.08 # arm velocity to trigger melody note (max of L/R)
+    melody_cooldown: 0.15        # seconds between melody note triggers
     melody_bend_scale: 4.0       # scale factor for per-note pitch bend
 
 

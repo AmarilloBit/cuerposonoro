@@ -488,29 +488,66 @@ See [`tests/manual/README.md`](tests/manual/README.md) for prerequisites and usa
 
 ## Benchmarks
 
-The project includes a dedicated benchmarking system. Key results:
+The project includes a dedicated benchmarking system that measures end-to-end latency across every pipeline stage (capture, pose estimation, feature extraction, send). All benchmarks use 300 frames per configuration.
 
-**Mac (MacBook Pro 2020 i7 + Logitech C922, MediaPipe CPU, 300 frames):**
+### Hardware Tested
 
-| Pose Model | Mean Latency | FPS | Under 80ms |
-|------------|-------------|-----|------------|
-| Lite (complexity=0) | 33.7ms | ~30 | 99–100% |
-| Full (complexity=1) | 34.7ms | ~30 | 99–100% |
-| Heavy (complexity=2) | 86.6ms | ~12 | 6–85% |
+| Machine | CPU | GPU | Backend | Camera |
+|---------|-----|-----|---------|--------|
+| MacBook Air M4 (2025) | Apple M4 | Apple M4 GPU (Metal) | `metal` | Built-in + Logitech C922 |
+| MacBook Pro (2020) | Intel Core i7-1068NG7 | Intel Iris Plus (not used) | `cpu` | Logitech C922 |
 
-**Jetson Orin Nano + Logitech C922, MediaPipe CPU, 60 frames:**
+### Results: Metal (MacBook Air M4)
+
+Metal GPU acceleration makes model complexity irrelevant for latency. All three model sizes perform identically.
+
+| Resolution | Pose Model | Pose Mean | Total Mean | P95 | FPS | Under 80ms |
+|------------|------------|-----------|------------|-----|-----|------------|
+| 640x480 | Lite (0) | 9.3ms | 33.3ms | 36.2ms | 30.3 | 100% |
+| 640x480 | Full (1) | 10.4ms | 33.3ms | 36.2ms | 30.3 | 100% |
+| 640x480 | Heavy (2) | 10.0ms | 33.4ms | 36.6ms | 30.4 | 99.9% |
+| 1280x720 | Lite (0) | 10.4ms | 33.3ms | 36.8ms | 30.4 | 100% |
+| 1280x720 | Full (1) | 10.5ms | 33.3ms | 36.6ms | 30.4 | 100% |
+| 1280x720 | Heavy (2) | 10.6ms | 33.3ms | 36.4ms | 30.4 | 100% |
+
+*Values averaged across OSC, OSC bundle, and MIDI output modes with the Logitech C922. Built-in camera results are equivalent (~11ms pose mean).*
+
+### Results: CPU (MacBook Pro 2020 Intel i7)
+
+CPU backend handles Lite and Full models at 30 FPS. The Heavy model exceeds the 80ms latency budget.
+
+| Resolution | Pose Model | Pose Mean | Total Mean | P95 | FPS | Under 80ms |
+|------------|------------|-----------|------------|-----|-----|------------|
+| 640x480 | Lite (0) | 15.5ms | 33.3ms | 39.1ms | 30.5 | 100% |
+| 640x480 | Full (1) | 19.4ms | 33.4ms | 38.8ms | 30.5 | 99.9% |
+| 640x480 | Heavy (2) | 60.8ms | 69.6ms | 98.9ms | 14.6 | 89.5% |
+| 1280x720 | Lite (0) | 15.2ms | 33.5ms | 39.4ms | 30.4 | 99.9% |
+| 1280x720 | Full (1) | 19.9ms | 33.4ms | 37.5ms | 30.4 | 99.9% |
+| 1280x720 | Heavy (2) | 68.2ms | 93.4ms | 113.2ms | 11.1 | 20.7% |
+
+### Results: Jetson Orin Nano (MediaPipe CPU)
 
 | Configuration | Mean | P95 | Max |
 |---------------|------|-----|-----|
 | Without `jetson_clocks` | 89.0ms | 98.9ms | 99.4ms |
 | With `jetson_clocks` | 55.9ms | 56.8ms | 57.1ms |
 
+### Key Findings
+
+1. **Metal eliminates model complexity cost.** Pose inference stays at ~10ms for all models (Lite/Full/Heavy), meaning users can select the Heavy model for maximum accuracy with no latency penalty.
+2. **CPU is viable for Lite and Full.** Both achieve 30 FPS with 100% of frames under 80ms. Heavy is not recommended for real-time use on CPU.
+3. **Resolution has minimal impact.** 720p adds negligible latency on both backends — the camera's 30 FPS cap is the bottleneck, not pose estimation.
+4. **Output mode is negligible.** OSC, OSC bundle, and MIDI all add <1ms and do not affect the overall latency profile.
+5. **Camera choice is neutral.** Built-in and Logitech C922 perform equivalently on Metal; capture latency differences are within noise.
+
+### Running Benchmarks
+
 ```bash
 python benchmarks/run_benchmark.py --preview --session-name my-session
 python benchmarks/analyze_results.py --save
 ```
 
-For full methodology and results, see [`benchmarks/README.md`](benchmarks/README.md).
+For full methodology, see [`benchmarks/README.md`](benchmarks/README.md). Raw data is in [`benchmarks/benchmark_results_tfg/`](benchmarks/benchmark_results_tfg/).
 
 ---
 

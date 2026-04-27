@@ -145,6 +145,22 @@ class TestCalculateGeneral:
         r = ext.calculate([make_landmark()] * 33)
         assert len(r) == 19
 
+    def test_descriptor_count_matches_documentation(self, ext, neutral):
+        """The number of descriptors must stay in sync with the memoir.
+
+        If this test fails, two things must be updated together:
+          - vision_processor/features.py (and any descriptor added/removed)
+          - the memoir: section 3.3.1, section 2.2.3, Table 6, Appendix C
+
+        Update both files in the same commit to prevent drift.
+        """
+        result = ext.calculate(neutral)
+        expected_count = 19
+        assert len(result) == expected_count, (
+            f"Got {len(result)} descriptors but memoir documents "
+            f"{expected_count}. Update both files together."
+        )
+
     def test_empty_features_defaults(self, ext):
         r = ext.calculate(None)
         assert r["energy"] == 0.0

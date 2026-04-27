@@ -92,19 +92,19 @@ def _draw_debug_overlay(frame, features: dict, midi_state: dict | None = None):
     r_vel   = features.get("rightArmVelocity", 0)
     l_vel   = features.get("leftArmVelocity", 0)
 
-    jerk_threshold = 0.4  # matches MidiSender default; could be read from config
-    r_triggered = r_jerk > jerk_threshold
-    l_triggered = l_jerk > jerk_threshold
+    # Trigger indicator adapts to the active MIDI mode
+    top_vel = max(r_vel, l_vel)
+    bp_triggered = top_vel > 0.08
+    jerk_triggered_r = r_jerk > 0.4
+    jerk_triggered_l = l_jerk > 0.4
 
-    r_color = (0, 80, 255) if r_triggered else (0, 255, 120)
-    l_color = (0, 80, 255) if l_triggered else (0, 255, 120)
+    r_color = (0, 80, 255) if (bp_triggered or jerk_triggered_r) else (0, 255, 120)
+    l_color = (0, 80, 255) if (bp_triggered or jerk_triggered_l) else (0, 255, 120)
 
     r_label = f"R-hand Y:{r_y:.2f} jerk:{r_jerk:.2f} vel:{r_vel:.2f}"
     l_label = f"L-hand Y:{l_y:.2f} jerk:{l_jerk:.2f} vel:{l_vel:.2f}"
-    if r_triggered:
-        r_label += "  *** TRIGGER ***"
-    if l_triggered:
-        l_label += "  *** TRIGGER ***"
+    if bp_triggered:
+        r_label += "  *** MELODY ***"
 
     put(r_label, 7, color=r_color)
     put(l_label, 8, color=l_color)

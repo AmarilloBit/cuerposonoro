@@ -17,38 +17,10 @@ from tkinter import filedialog, ttk
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_SCRIPT = os.path.join(ROOT_DIR, "main.py")
 CALIBRATE_SCRIPT = os.path.join(ROOT_DIR, "calibrate.py")
-ASSETS_MIDI = os.path.join(ROOT_DIR, "assets", "midi")
 
 MODES = ["osc", "midi"]
-MIDI_MODES = ["classic", "musical", "blueprint"]
+MIDI_MODES = ["classic", "musical"]
 BACKENDS = ["auto", "cpu", "metal", "tensorrt"]
-
-
-def _scan_genres() -> list[str]:
-    """Scan assets/midi/ for genre folder names."""
-    if not os.path.isdir(ASSETS_MIDI):
-        return []
-    return sorted(
-        d for d in os.listdir(ASSETS_MIDI)
-        if os.path.isdir(os.path.join(ASSETS_MIDI, d)) and not d.startswith(".")
-    )
-
-
-def _scan_keys(genre: str) -> list[str]:
-    """Scan a genre folder for key subfolder names (cleaned)."""
-    genre_path = os.path.join(ASSETS_MIDI, genre)
-    if not os.path.isdir(genre_path):
-        return []
-    keys = []
-    for folder in sorted(os.listdir(genre_path)):
-        if os.path.isdir(os.path.join(genre_path, folder)):
-            # Extract key from "01 - C Major - A Minor"
-            parts = folder.split(" - ", 1)
-            if len(parts) > 1:
-                keys.append(parts[1])
-            else:
-                keys.append(folder)
-    return keys
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +33,6 @@ class LauncherApp:
         self.root.title("Cuerpo Sonoro — Launcher")
         self.root.resizable(False, False)
 
-        self.genres = _scan_genres()
         self.process: subprocess.Popen | None = None
 
         self._build_ui()
@@ -90,46 +61,12 @@ class LauncherApp:
         # -- MIDI mode ------------------------------------------------------
         self.midi_mode_label = ttk.Label(frame, text="MIDI mode:")
         self.midi_mode_label.grid(row=row, column=0, sticky="w", **pad)
-        self.midi_mode_var = tk.StringVar(value="blueprint")
+        self.midi_mode_var = tk.StringVar(value="classic")
         self.midi_mode_combo = ttk.Combobox(
             frame, textvariable=self.midi_mode_var, values=MIDI_MODES,
             state="readonly", width=22,
         )
         self.midi_mode_combo.grid(row=row, column=1, sticky="w", **pad)
-        self.midi_mode_combo.bind("<<ComboboxSelected>>", lambda _: self._on_midi_mode_change())
-        row += 1
-
-        # -- Separator: Blueprint options -----------------------------------
-        self.bp_sep = ttk.Separator(frame, orient="horizontal")
-        self.bp_sep.grid(row=row, column=0, columnspan=3, sticky="ew", pady=8)
-        row += 1
-
-        self.bp_label = ttk.Label(frame, text="Blueprint options", font=("TkDefaultFont", 0, "bold"))
-        self.bp_label.grid(row=row, column=0, columnspan=2, sticky="w", **pad)
-        row += 1
-
-        # -- Genre ----------------------------------------------------------
-        self.genre_label = ttk.Label(frame, text="Genre:")
-        self.genre_label.grid(row=row, column=0, sticky="w", **pad)
-        self.genre_var = tk.StringVar(value="(random)")
-        genre_values = ["(random)"] + self.genres
-        self.genre_combo = ttk.Combobox(
-            frame, textvariable=self.genre_var, values=genre_values,
-            state="readonly", width=30,
-        )
-        self.genre_combo.grid(row=row, column=1, sticky="w", **pad)
-        self.genre_combo.bind("<<ComboboxSelected>>", lambda _: self._on_genre_change())
-        row += 1
-
-        # -- Key ------------------------------------------------------------
-        self.key_label = ttk.Label(frame, text="Key:")
-        self.key_label.grid(row=row, column=0, sticky="w", **pad)
-        self.key_var = tk.StringVar(value="(random)")
-        self.key_combo = ttk.Combobox(
-            frame, textvariable=self.key_var, values=["(random)"],
-            state="readonly", width=30,
-        )
-        self.key_combo.grid(row=row, column=1, sticky="w", **pad)
         row += 1
 
         # -- Separator: General options -------------------------------------
@@ -251,8 +188,8 @@ class LauncherApp:
         self.stop_btn.pack(side="left", padx=4)
 
         # Trace variables to update command preview
-        for var in (self.mode_var, self.midi_mode_var, self.genre_var,
-                    self.key_var, self.backend_var, self.source_var, self.debug_var):
+        for var in (self.mode_var, self.midi_mode_var, self.backend_var,
+                    self.source_var, self.debug_var):
             var.trace_add("write", lambda *_: self._update_cmd_preview())
 
         self._update_cmd_preview()
@@ -263,24 +200,6 @@ class LauncherApp:
         is_midi = self.mode_var.get() == "midi"
         state = "readonly" if is_midi else "disabled"
         self.midi_mode_combo.configure(state=state)
-        self._on_midi_mode_change()
-
-    def _on_midi_mode_change(self):
-        show_bp = (self.mode_var.get() == "midi" and self.midi_mode_var.get() == "blueprint")
-        state = "readonly" if show_bp else "disabled"
-        self.genre_combo.configure(state=state)
-        self.key_combo.configure(state=state)
-        self._update_cmd_preview()
-
-    def _on_genre_change(self):
-        genre = self.genre_var.get()
-        if genre == "(random)":
-            self.key_combo.configure(values=["(random)"])
-            self.key_var.set("(random)")
-        else:
-            keys = _scan_keys(genre)
-            self.key_combo.configure(values=["(random)"] + keys)
-            self.key_var.set("(random)")
         self._update_cmd_preview()
 
     def _browse_source(self):
@@ -300,16 +219,6 @@ class LauncherApp:
 
         if self.mode_var.get() == "midi":
             cmd.extend(["--midi-mode", self.midi_mode_var.get()])
-
-            if self.midi_mode_var.get() == "blueprint":
-                genre = self.genre_var.get()
-                if genre != "(random)":
-                    cmd.extend(["--genre", genre])
-                key = self.key_var.get()
-                if key != "(random)":
-                    # Extract just the major key part, e.g. "C Major" from "C Major - A Minor"
-                    key_name = key.split(" - ")[0].strip() if " - " in key else key
-                    cmd.extend(["--key", key_name])
 
         backend = self.backend_var.get()
         if backend != "auto":

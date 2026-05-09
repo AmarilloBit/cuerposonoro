@@ -330,23 +330,6 @@ class TestCreateSender:
         assert isinstance(sender, MusicalMidiSender)
         sender.close()
 
-    def test_blueprint_midi_sender(self, tmp_dir):
-        from unittest.mock import patch, MagicMock
-        path = _write_yaml(tmp_dir, """\
-            output:
-              mode: midi
-              midi_mode: blueprint
-              blueprint:
-                silence_timeout: 30
-        """)
-        config = Config(path=path)
-        with patch("vision_processor.midi.blueprint.mido.open_output") as mock_open:
-            mock_open.return_value = MagicMock()
-            sender = config.create_sender()
-        from vision_processor.midi.blueprint import BlueprintMidiSender
-        assert isinstance(sender, BlueprintMidiSender)
-        sender.close()
-
     def test_unknown_mode_raises(self, tmp_dir):
         path = _write_yaml(tmp_dir, "output:\n  mode: foobar")
         config = Config(path=path)

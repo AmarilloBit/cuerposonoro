@@ -432,17 +432,6 @@ class Config:
                     jump_size_slow=self.musical_jump_size_slow,
                     jump_size_fast=self.musical_jump_size_fast,
                 )
-            elif midi_mode == "blueprint":
-                from vision_processor.midi.blueprint import BlueprintMidiSender
-                blueprint_config = self.get("output.blueprint", {})
-                genre = getattr(self, "_blueprint_genre", None)
-                key = getattr(self, "_blueprint_key", None)
-                return BlueprintMidiSender(
-                    config=blueprint_config,
-                    port_name=self.midi_port_name,
-                    genre=genre,
-                    key=key,
-                )
             else:
                 from vision_processor.midi.classic import ClassicMidiSender
                 sender = ClassicMidiSender(port_name=self.midi_port_name)

@@ -48,7 +48,7 @@ Cuerpo Sonoro captures human body movement through computer vision and translate
 
 Cuerpo Sonoro explores how the human body can become a musical instrument. A camera captures the performer's movements, a pose estimation model detects body landmarks in real time, and a set of algorithms extract meaningful motion features. These features are then mapped to musical parameters and sent via OSC to SuperCollider for audio synthesis, or via MIDI/MPE to external synthesizers like Surge XT.
 
-Three MIDI modes are available: **classic** (hand position selects note, jerk triggers it), **musical** (tempo-quantized melody navigating chord tones based on movement direction), and **blueprint** (chord progressions loaded from Unison MIDI Blueprint library files, driven by body gestures).
+Two MIDI modes are available: **classic** (hand position selects note, jerk triggers it) and **musical** (tempo-quantized melody navigating chord tones based on movement direction).
 
 The system supports two modes of operation:
 
@@ -197,42 +197,6 @@ The overall motion energy of the body is sent to SuperCollider to control backgr
 | `rightElbowHipAngle` | Shoulder, elbow, hip (12, 14, 24) | 0.0 – 1.0 |
 | `leftElbowHipAngle` | Shoulder, elbow, hip (11, 13, 23) | 0.0 – 1.0 |
 | `headTilt` | Ears (7, 8) | -1.0 – 1.0 |
-| `pelvis_thrust` | Hips (23, 24), Ankles (27, 28) | -1.0 – 1.0 |
-| `spine_lean` | Shoulders (11, 12), Hips (23, 24) | -1.0 – 1.0 |
-
-### Blueprint Mode
-
-Blueprint mode loads chord progressions from the **Unison MIDI Blueprint** library. Instead of hardcoded chord tones, all harmony comes from parsed MIDI files organized by genre and key.
-
-**Setup:** Copy your Unison MIDI Blueprint library to `assets/midi/` in the project root. The directory structure should be:
-
-```
-assets/midi/
-├── Jazz/
-│   ├── 01 - C Major - A Minor/
-│   │   └── Chord Progressions/
-│   │       ├── 01 - C Major Progressions/
-│   │       │   └── *.mid
-│   │       └── 02 - A Minor Progressions/
-│   │           └── *.mid
-│   └── ...
-├── Neo-Soul/
-└── ...
-```
-
-The `assets/midi/` directory is gitignored. Each user must provide their own copy of the library.
-
-**Body mapping in blueprint mode:**
-
-| Body Part | Descriptor | Controls |
-|-----------|-----------|----------|
-| Pelvis thrust | `pelvis_thrust` | Chord navigation (advance/retreat) |
-| Wrist height | mean(`rightHandY`, `leftHandY`) | Melody note selection within chord |
-| Arm velocity | mean(`rightArmVelocity`, `leftArmVelocity`) | Melody trigger + attack velocity |
-| Right wrist delta | `rightHandY` frame delta | Per-note pitch bend (MPE) |
-| Spine lean | `spine_lean` | CC1 modulation (vibrato) |
-| Head tilt | `headTilt` | Global pitch bend |
-| Ankles | velocity of landmarks 27, 28 | Bass trigger |
 
 ---
 
@@ -274,9 +238,7 @@ cuerposonoro/
 │   ├── midi/                   # MIDI sender strategy pattern
 │   │   ├── base.py             # BaseMidiSender abstract interface
 │   │   ├── classic.py          # Classic mode: hand Y position → note, jerk triggers
-│   │   ├── musical.py          # Musical mode: tempo-quantized, chord-tone navigation
-│   │   ├── blueprint.py        # Blueprint mode: Unison MIDI library chord progressions
-│   │   └── blueprint_loader.py # MIDI file parser for Unison Blueprint library
+│   │   └── musical.py          # Musical mode: tempo-quantized, chord-tone navigation
 │   ├── midi_sender.py          # Backward-compatible alias → ClassicMidiSender
 │   ├── config.py               # Centralized config loader with factory methods
 │   └── latency_logger.py       # Per-stage latency instrumentation
@@ -371,9 +333,7 @@ python main.py --mode midi
 | `--source PATH` | Use a video file instead of webcam |
 | `--debug` | Show feature values and skeleton overlay |
 | `--mode osc\|midi` | Override output mode |
-| `--midi-mode classic\|musical\|blueprint` | Override MIDI mode |
-| `--genre NAME` | Genre for blueprint mode (e.g. `"Neo-Soul"`) |
-| `--key NAME` | Key for blueprint mode (e.g. `"D Major"`) |
+| `--midi-mode classic\|musical` | Override MIDI mode |
 
 ---
 
@@ -429,8 +389,6 @@ python3 main.py --backend cpu --debug
 | OSC (default) | SuperCollider | `python main.py` |
 | MIDI classic | Surge XT | `python main.py --mode midi --midi-mode classic` |
 | MIDI musical | Surge XT | `python main.py --mode midi --midi-mode musical` |
-| MIDI blueprint | Surge XT | `python main.py --mode midi --midi-mode blueprint` |
-| MIDI blueprint (fixed) | Surge XT | `python main.py --mode midi --midi-mode blueprint --genre "Jazz" --key "D Major"` |
 | Video file (debug) | any | `python main.py --source path/to/video.mp4 --debug` |
 
 ---

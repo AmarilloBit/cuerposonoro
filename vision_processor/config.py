@@ -273,14 +273,16 @@ class Config:
     # Factory methods — create pipeline components from config
     # =========================================================================
 
-    def create_camera(self, source: str | None = None):
+    def create_camera(self, source: str | None = None, loop: bool = True):
         """
         Create a camera from config.
 
         Args:
             source: Optional video file path (e.g. "tests/videos/test.mp4").
                     If None, opens the live webcam defined in config.yaml.
-                    If a file path is given, opens VideoFileCamera in loop mode.
+            loop: When `source` is a video file, restart from the beginning
+                  on EOF if True; otherwise stop after one pass. Ignored for
+                  webcam sources.
 
         Returns:
             WebcamCamera or VideoFileCamera instance.
@@ -291,7 +293,7 @@ class Config:
         from vision_processor.capture import WebcamCamera, VideoFileCamera
 
         if source is not None:
-            return VideoFileCamera(path=source, loop=True)
+            return VideoFileCamera(path=source, loop=loop)
 
         return WebcamCamera(
             device_id=self.camera_device_id,

@@ -161,6 +161,13 @@ def _parse_args():
         default=None,
         help="Force a specific pose estimation backend (default: auto-detect).",
     )
+    parser.add_argument(
+        "--no-loop",
+        action="store_true",
+        dest="no_loop",
+        help="When using --source, exit at end of file instead of looping. "
+             "Useful for one-shot recordings.",
+    )
     return parser.parse_args()
 
 
@@ -184,7 +191,8 @@ def main():
 
     print(f"[main] Config: {config.describe()}")
     if args.source:
-        print(f"[main] Source: video file → {args.source}  (looping)")
+        loop_label = "single pass" if args.no_loop else "looping"
+        print(f"[main] Source: video file → {args.source}  ({loop_label})")
     else:
         print(f"[main] Source: webcam device {config.camera_device_id}")
     if args.debug:
@@ -192,7 +200,7 @@ def main():
 
     # --- Pipeline components ---
     try:
-        camera = config.create_camera(source=args.source)
+        camera = config.create_camera(source=args.source, loop=not args.no_loop)
     except RuntimeError as e:
         print(f"[ERROR] {e}")
         sys.exit(1)

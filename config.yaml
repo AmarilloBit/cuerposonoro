@@ -47,7 +47,7 @@ features:
 
 output:
   mode: osc                 # "osc" or "midi"
-  midi_mode: classic        # "classic" or "musical" (only used when mode: midi)
+  midi_mode: classic        # "classic" or "rhythmical" (only used when mode: midi)
 
 
 # OSC (SuperCollider)
@@ -63,7 +63,7 @@ osc:
 
 midi:
   port_name: "CuerpoSonoro"
-  jerk_threshold: 0.4        # Minimum hand jerk to trigger a melody note (canonical threshold)
+  jerk_threshold: 0.15       # Minimum hand jerk to trigger a melody note (canonical threshold)
   base_note_duration: 0.3   # Base note duration in seconds (classic mode)
   min_note_duration: 0.15
   max_note_duration: 0.6

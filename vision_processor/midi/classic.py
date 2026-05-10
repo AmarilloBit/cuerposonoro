@@ -62,7 +62,13 @@ class ClassicMidiSender(BaseMidiSender):
     MELODY_LEFT_BASE  = 72   # C5
 
     JERK_THRESHOLD      = 0.4
-    HIP_TILT_THRESHOLD  = 0.6
+    HIP_TILT_THRESHOLD  = 0.2
+
+    # Velocity ranges (0-127). Chords stack 3 notes simultaneously, so they
+    # need a much lower velocity than the melody to sit underneath it in the
+    # mix instead of dominating it.
+    CHORD_VELOCITY_MIN = 15
+    CHORD_VELOCITY_MAX = 55
 
     def __init__(self, port_name: str = "CuerpoSonoro"):
         self.port_name = port_name
@@ -132,7 +138,8 @@ class ClassicMidiSender(BaseMidiSender):
         self.current_chord_notes = list(self.CHORDS[new_chord])
         self.current_chord = new_chord
 
-        velocity = int(40 + velocity_factor * 87)
+        velocity_range = self.CHORD_VELOCITY_MAX - self.CHORD_VELOCITY_MIN
+        velocity = int(self.CHORD_VELOCITY_MIN + velocity_factor * velocity_range)
         velocity = max(1, min(127, velocity))
 
         for note, channel in zip(self.current_chord_notes,

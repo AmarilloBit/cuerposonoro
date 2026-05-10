@@ -18,7 +18,7 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_SCRIPT = os.path.join(ROOT_DIR, "main.py")
 
 MODES = ["osc", "midi"]
-MIDI_MODES = ["classic", "musical"]
+MIDI_MODES = ["classic", "rhythmical"]
 BACKENDS = ["auto", "cpu", "metal", "tensorrt"]
 
 

@@ -204,30 +204,14 @@ class Config:
     def midi_mode(self) -> str:
         return self.get("output.midi_mode", "classic")
 
-    # Musical sender settings
+    # Rhythmical sender settings (percussive pentatonic mode)
     @property
-    def musical_tempo_bpm(self) -> int:
-        return self.get("musical.tempo_bpm", 120)
+    def rhythmical_tempo_bpm(self) -> int:
+        return self.get("rhythmical.tempo_bpm", 120)
 
     @property
-    def musical_note_subdivision(self) -> int:
-        return self.get("musical.note_subdivision", 8)
-
-    @property
-    def musical_direction_threshold(self) -> float:
-        return self.get("musical.direction_threshold", 0.03)
-
-    @property
-    def musical_velocity_threshold(self) -> float:
-        return self.get("musical.velocity_threshold", 0.4)
-
-    @property
-    def musical_jump_size_slow(self) -> int:
-        return self.get("musical.jump_size_slow", 1)
-
-    @property
-    def musical_jump_size_fast(self) -> int:
-        return self.get("musical.jump_size_fast", 2)
+    def rhythmical_melody_velocity_floor(self) -> float:
+        return self.get("rhythmical.melody_velocity_floor", 0.05)
 
     # Camera profiles
     @property
@@ -273,14 +257,16 @@ class Config:
     # Factory methods — create pipeline components from config
     # =========================================================================
 
-    def create_camera(self, source: str | None = None):
+    def create_camera(self, source: str | None = None, loop: bool = True):
         """
         Create a camera from config.
 
         Args:
             source: Optional video file path (e.g. "tests/videos/test.mp4").
                     If None, opens the live webcam defined in config.yaml.
-                    If a file path is given, opens VideoFileCamera in loop mode.
+            loop: When `source` is a video file, restart from the beginning
+                  on EOF if True; otherwise stop after one pass. Ignored for
+                  webcam sources.
 
         Returns:
             WebcamCamera or VideoFileCamera instance.
@@ -291,7 +277,7 @@ class Config:
         from vision_processor.capture import WebcamCamera, VideoFileCamera
 
         if source is not None:
-            return VideoFileCamera(path=source, loop=True)
+            return VideoFileCamera(path=source, loop=loop)
 
         return WebcamCamera(
             device_id=self.camera_device_id,
@@ -410,7 +396,7 @@ class Config:
         Create the appropriate sender based on output.mode and output.midi_mode.
 
         Returns:
-            OSCSender, ClassicMidiSender, or MusicalMidiSender instance.
+            OSCSender, ClassicMidiSender, or RhythmicalMidiSender instance.
         """
         mode = self.output_mode
 
@@ -421,16 +407,12 @@ class Config:
         elif mode == "midi":
             midi_mode = self.midi_mode
 
-            if midi_mode == "musical":
-                from vision_processor.midi.musical import MusicalMidiSender
-                return MusicalMidiSender(
+            if midi_mode == "rhythmical":
+                from vision_processor.midi.rhythmical import RhythmicalMidiSender
+                return RhythmicalMidiSender(
                     port_name=self.midi_port_name,
-                    tempo_bpm=self.musical_tempo_bpm,
-                    note_subdivision=self.musical_note_subdivision,
-                    direction_threshold=self.musical_direction_threshold,
-                    velocity_threshold=self.musical_velocity_threshold,
-                    jump_size_slow=self.musical_jump_size_slow,
-                    jump_size_fast=self.musical_jump_size_fast,
+                    tempo_bpm=self.rhythmical_tempo_bpm,
+                    melody_velocity_floor=self.rhythmical_melody_velocity_floor,
                 )
             else:
                 from vision_processor.midi.classic import ClassicMidiSender

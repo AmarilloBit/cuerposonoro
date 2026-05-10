@@ -49,7 +49,7 @@ Cuerpo Sonoro captures human body movement through computer vision and translate
 
 Cuerpo Sonoro explores how the human body can become a musical instrument. A camera captures the performer's movements, a pose estimation model detects body landmarks in real time, and a set of algorithms extract meaningful motion features. These features are then mapped to musical parameters and sent via OSC to SuperCollider for audio synthesis, or via MIDI/MPE to external synthesizers like Surge XT.
 
-Two MIDI modes are available: **classic** (hand position selects note, jerk triggers it) and **musical** (tempo-quantized melody navigating chord tones based on movement direction).
+Two MIDI modes are available: **classic** (hand position selects note, jerk triggers it) and **rhythmical** (percussive pentatonic in A Hirajōshi, tempo-quantized at 1/16, every kinematic feature drives audible behaviour, stillness produces silence).
 
 The system supports two modes of operation:
 
@@ -239,7 +239,7 @@ cuerposonoro/
 │   ├── midi/                   # MIDI sender strategy pattern
 │   │   ├── base.py             # BaseMidiSender abstract interface
 │   │   ├── classic.py          # Classic mode: hand Y position → note, jerk triggers
-│   │   └── musical.py          # Musical mode: tempo-quantized, chord-tone navigation
+│   │   └── rhythmical.py       # Rhythmical mode: percussive pentatonic, all 17 features mapped
 │   ├── midi_sender.py          # Backward-compatible alias → ClassicMidiSender
 │   ├── config.py               # Centralized config loader with factory methods
 │   └── latency_logger.py       # Per-stage latency instrumentation
@@ -254,7 +254,7 @@ cuerposonoro/
 │   ├── unit/                   # Automated unit tests (pytest)
 │   │   ├── test_features.py
 │   │   ├── test_config.py
-│   │   └── test_musical.py
+│   │   └── test_rhythmical.py
 │   ├── integration/            # Automated integration tests (pytest)
 │   │   └── test_integration.py
 │   └── manual/                 # Interactive scripts (require hardware)
@@ -348,7 +348,7 @@ python main.py --mode midi
 | `--source PATH` | Use a video file instead of the live webcam |
 | `--debug` | Show feature values and skeleton overlay on the video window |
 | `--mode osc\|midi` | Override `output.mode` from `config.yaml` |
-| `--midi-mode classic\|musical` | Override `output.midi_mode` (only used when `--mode midi`) |
+| `--midi-mode classic\|rhythmical` | Override `output.midi_mode` (only used when `--mode midi`) |
 
 ### Launcher (GUI)
 
@@ -361,7 +361,7 @@ python launcher.py
 The launcher exposes:
 
 - **Output mode** — `osc` (SuperCollider) or `midi` (Surge XT).
-- **MIDI mode** — `classic` or `musical` (only shown when `output mode = midi`).
+- **MIDI mode** — `classic` or `rhythmical` (only shown when `output mode = midi`).
 - **Backend** — `auto`, `cpu`, `metal` or `tensorrt` (the latter is a stub and not active in production; see [GPU backend investigation](#gpu-backend-investigation-jetson)).
 - **Source** — live webcam or a video file picked through a file dialog.
 - **Debug overlay** — toggles the feature/skeleton overlay on the video window.
@@ -422,7 +422,7 @@ python3 main.py --backend cpu --debug
 |------|------------|---------|
 | OSC (default) | SuperCollider | `python main.py` |
 | MIDI classic | Surge XT | `python main.py --mode midi --midi-mode classic` |
-| MIDI musical | Surge XT | `python main.py --mode midi --midi-mode musical` |
+| MIDI rhythmical | Surge XT | `python main.py --mode midi --midi-mode rhythmical` |
 | Video file (debug) | any | `python main.py --source path/to/video.mp4 --debug` |
 
 ---
@@ -447,7 +447,7 @@ Every runtime parameter lives in `config.yaml` at the repo root. CLI flags only 
 | `camera_profiles` | Named device-id presets used by the benchmark runner |
 | `pose` | MediaPipe model complexity (Lite/Full/Heavy) and detection/tracking thresholds |
 | `features` | Exponential-smoothing factor applied to feature values |
-| `output` | `mode` (`osc` or `midi`) and, for MIDI, `midi_mode` (`classic` or `musical`) |
+| `output` | `mode` (`osc` or `midi`) and, for MIDI, `midi_mode` (`classic` or `rhythmical`) |
 | `osc` | SuperCollider host/port and `send_mode` (`individual` or `bundle`) |
 | `midi` | Virtual port name, jerk threshold and note-duration envelope |
 | `audio` | Active SuperCollider and Surge XT presets (currently a documentation placeholder) |
@@ -475,7 +475,7 @@ Typical usage while iterating on thresholds or new sensor mappings:
 
 ```bash
 python debug_tools/analyze_video.py --source assets/video-calibration/test-debug-1.mov --midi-mode classic
-python debug_tools/analyze_video.py --source path/to/video.mov --midi-mode musical --out debug_tools/debug_output/my-session/
+python debug_tools/analyze_video.py --source path/to/video.mov --midi-mode rhythmical --out debug_tools/debug_output/my-session/
 ```
 
 Output goes to `debug_tools/debug_output/<video_stem>/` by default. That directory is gitignored.

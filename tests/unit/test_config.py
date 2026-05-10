@@ -56,7 +56,7 @@ def minimal_yaml(tmp_dir):
           smoothing_factor: 0.5
         output:
           mode: midi
-          midi_mode: musical
+          midi_mode: rhythmical
         osc:
           host: "10.0.0.1"
           port: 9000
@@ -182,7 +182,7 @@ class TestProperties:
     def test_output_properties(self, minimal_yaml):
         c = Config(path=minimal_yaml)
         assert c.output_mode == "midi"
-        assert c.midi_mode == "musical"
+        assert c.midi_mode == "rhythmical"
 
     def test_osc_properties(self, minimal_yaml):
         c = Config(path=minimal_yaml)
@@ -232,14 +232,10 @@ class TestProperties:
         assert len(c.benchmark_output_modes) == 3
         assert len(c.benchmark_backends) == 1
 
-    def test_musical_properties_defaults(self, empty_yaml):
+    def test_rhythmical_properties_defaults(self, empty_yaml):
         c = Config(path=empty_yaml)
-        assert c.musical_tempo_bpm == 120
-        assert c.musical_note_subdivision == 8
-        assert c.musical_direction_threshold == 0.03
-        assert c.musical_velocity_threshold == 0.4
-        assert c.musical_jump_size_slow == 1
-        assert c.musical_jump_size_fast == 2
+        assert c.rhythmical_tempo_bpm == 120
+        assert c.rhythmical_melody_velocity_floor == 0.05
 
 
 # ===========================================================================
@@ -315,19 +311,19 @@ class TestCreateSender:
         assert isinstance(sender, ClassicMidiSender)
         assert sender.JERK_THRESHOLD == 0.5
 
-    def test_musical_midi_sender(self, tmp_dir):
+    def test_rhythmical_midi_sender(self, tmp_dir):
         from unittest.mock import patch, MagicMock
         path = _write_yaml(tmp_dir, """\
             output:
               mode: midi
-              midi_mode: musical
+              midi_mode: rhythmical
         """)
         config = Config(path=path)
-        with patch("vision_processor.midi.musical.mido.open_output") as mock_open:
+        with patch("vision_processor.midi.rhythmical.mido.open_output") as mock_open:
             mock_open.return_value = MagicMock()
             sender = config.create_sender()
-        from vision_processor.midi.musical import MusicalMidiSender
-        assert isinstance(sender, MusicalMidiSender)
+        from vision_processor.midi.rhythmical import RhythmicalMidiSender
+        assert isinstance(sender, RhythmicalMidiSender)
         sender.close()
 
     def test_unknown_mode_raises(self, tmp_dir):

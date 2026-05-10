@@ -5,12 +5,13 @@
 # WHAT IT DOES
 #   1. Verifies that BlackHole and switchaudio-osx are installed.
 #   2. Switches the macOS system audio output to the multi-output device that
-#      sends sound to both your speakers and BlackHole (so OBS can capture it).
-#   3. Opens OBS Studio if it isn't already running.
-#   4. Waits for you to confirm that OBS is recording.
-#   5. Runs `main.py` against the calibration video in MIDI/classic/debug mode,
+#      sends sound to both your speakers and BlackHole (so the screen recorder
+#      can capture it via BlackHole).
+#   3. Waits for you to start a macOS Screen Recording (Cmd+Shift+5) with
+#      BlackHole 2ch as the microphone source.
+#   4. Runs `main.py` against the calibration video in MIDI/classic/debug mode,
 #      with --no-loop so it exits after a single pass.
-#   6. Restores your previous audio output device on exit.
+#   5. Restores your previous audio output device on exit.
 #
 # WHAT YOU MUST DO ONCE, MANUALLY, BEFORE THE FIRST RUN
 #   - Create a Multi-Output Device in Audio MIDI Setup named exactly
@@ -18,9 +19,9 @@
 #     containing BlackHole 2ch + your speakers.
 #   - In Surge XT: enable MPE, set Output = CuerpoSonoro-Record, load an MPE
 #     patch (e.g. 'Bloom').
-#   - In OBS: create a scene with two sources:
-#       (a) Window Capture pointing at the OpenCV window 'Cuerpo Sonoro'
-#       (b) Audio Input Capture using device 'BlackHole 2ch'
+#   - Grant Screen Recording permission to the screenshot tool: System Settings
+#     > Privacy & Security > Screen Recording > enable for 'Screenshot' (or
+#     'Captura de pantalla'). Required only the first time.
 #   - The very first time you run main.py, tick `CuerpoSonoro` under
 #     Surge XT > Options > Audio/MIDI Settings > Active MIDI inputs.
 #     Surge XT should remember this for subsequent runs.
@@ -38,7 +39,7 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VIDEO_PATH="${1:-${REPO_ROOT}/calibration/calibration-video.mp4}"
+VIDEO_PATH="${1:-${REPO_ROOT}/calibration/clasx2.mp4}"
 AUDIO_DEVICE_NAME="CuerpoSonoro-Record"
 VENV_ACTIVATE="${REPO_ROOT}/.venv/bin/activate"
 
@@ -79,12 +80,6 @@ if ! SwitchAudioSource -a -t output | grep -q "$AUDIO_DEVICE_NAME"; then
 fi
 ok "Multi-Output Device '$AUDIO_DEVICE_NAME' present"
 
-if ! pgrep -x "OBS" >/dev/null 2>&1; then
-    note "OBS not running, opening it..."
-    open -a OBS
-fi
-ok "OBS launched (or already running)"
-
 # -----------------------------------------------------------------------------
 # Audio routing
 # -----------------------------------------------------------------------------
@@ -109,16 +104,23 @@ ok "Audio output switched to: $AUDIO_DEVICE_NAME"
 
 cat <<EOF
 
-$(bold "Now do this in OBS:")
-  1. Bring OBS to the front.
-  2. Make sure your scene with the 'Cuerpo Sonoro' Window Capture and the
-     BlackHole 2ch audio source is selected.
-  3. Click 'Start Recording'.
+$(bold "Now start a macOS Screen Recording:")
+  1. Press Cmd+Shift+5.
+  2. Click 'Record Selected Portion' (the dashed-square icon).
+  3. Click 'Options' and set:
+       - Microphone   → BlackHole 2ch
+       - Save to      → wherever you want the .mov to land
+       - Show Mouse Clicks → off
+  4. Drag a selection over the area where the 'Cuerpo Sonoro' window will
+     appear (top-left of your screen by default). Make it a bit larger than
+     needed — you can crop later.
+  5. Click 'Record'.
 
-When OBS shows the red REC indicator, come back here and press [Enter].
+When the recording is rolling, come back here and press [Enter].
+The Cuerpo Sonoro window will then open inside your selection.
 EOF
 
-read -r -p ">> Press Enter when OBS is recording..." _
+read -r -p ">> Press Enter when the screen recording is rolling..." _
 
 # -----------------------------------------------------------------------------
 # Run the pipeline
@@ -138,9 +140,11 @@ python main.py \
     --source "$VIDEO_PATH" \
     --mode midi \
     --midi-mode classic \
+    --backend metal \
     --debug \
     --no-loop
 
 bold "Pipeline finished."
-echo "Now stop the recording in OBS (Cmd+Shift+R or the 'Stop Recording' button)."
-echo "The recorded file will be in your OBS recordings folder."
+echo "Now stop the screen recording: click the Stop button in the menu bar"
+echo "(top-right, square-in-circle icon) or press Cmd+Ctrl+Esc."
+echo "The .mov file will be saved to the location you chose in 'Options'."

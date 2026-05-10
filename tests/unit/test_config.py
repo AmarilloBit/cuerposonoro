@@ -235,11 +235,7 @@ class TestProperties:
     def test_musical_properties_defaults(self, empty_yaml):
         c = Config(path=empty_yaml)
         assert c.musical_tempo_bpm == 120
-        assert c.musical_note_subdivision == 8
-        assert c.musical_direction_threshold == 0.03
-        assert c.musical_velocity_threshold == 0.4
-        assert c.musical_jump_size_slow == 1
-        assert c.musical_jump_size_fast == 2
+        assert c.musical_melody_trigger_threshold == 0.08
 
 
 # ===========================================================================

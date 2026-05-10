@@ -204,30 +204,14 @@ class Config:
     def midi_mode(self) -> str:
         return self.get("output.midi_mode", "classic")
 
-    # Musical sender settings
+    # Musical sender settings (percussive pentatonic mode)
     @property
     def musical_tempo_bpm(self) -> int:
         return self.get("musical.tempo_bpm", 120)
 
     @property
-    def musical_note_subdivision(self) -> int:
-        return self.get("musical.note_subdivision", 8)
-
-    @property
-    def musical_direction_threshold(self) -> float:
-        return self.get("musical.direction_threshold", 0.03)
-
-    @property
-    def musical_velocity_threshold(self) -> float:
-        return self.get("musical.velocity_threshold", 0.4)
-
-    @property
-    def musical_jump_size_slow(self) -> int:
-        return self.get("musical.jump_size_slow", 1)
-
-    @property
-    def musical_jump_size_fast(self) -> int:
-        return self.get("musical.jump_size_fast", 2)
+    def musical_melody_trigger_threshold(self) -> float:
+        return self.get("musical.melody_trigger_threshold", 0.08)
 
     # Camera profiles
     @property
@@ -428,11 +412,7 @@ class Config:
                 return MusicalMidiSender(
                     port_name=self.midi_port_name,
                     tempo_bpm=self.musical_tempo_bpm,
-                    note_subdivision=self.musical_note_subdivision,
-                    direction_threshold=self.musical_direction_threshold,
-                    velocity_threshold=self.musical_velocity_threshold,
-                    jump_size_slow=self.musical_jump_size_slow,
-                    jump_size_fast=self.musical_jump_size_fast,
+                    melody_trigger_threshold=self.musical_melody_trigger_threshold,
                 )
             else:
                 from vision_processor.midi.classic import ClassicMidiSender

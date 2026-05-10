@@ -324,20 +324,22 @@ def analyze(source: str, midi_mode: str, output_dir: str):
     feature_extractor = FeatureExtractor()
 
     if midi_mode == "musical":
-        sender = InstrumentedMusicalSender(
-            direction_threshold=config.musical_direction_threshold,
-            velocity_threshold=config.musical_velocity_threshold,
-            jump_size_slow=config.musical_jump_size_slow,
-            jump_size_fast=config.musical_jump_size_fast,
-        )
+        # TODO: InstrumentedMusicalSender still mirrors the OLD musical
+        # sender (chord-tones + direction-based melody). The live
+        # MusicalMidiSender has been rewritten to a percussive
+        # pentatonic architecture; this analyzer no longer reflects
+        # what the live pipeline produces. Until it's rewritten, the
+        # thresholds below are the defaults of the legacy logic.
+        sender = InstrumentedMusicalSender()
     else:
         sender = InstrumentedClassicSender()
         sender.JERK_THRESHOLD = config.midi_jerk_threshold
 
-    # Threshold values from config (local to this call)
+    # Threshold values for plotting / analysis. The musical thresholds
+    # are the legacy defaults baked into InstrumentedMusicalSender.
     jerk_threshold      = config.midi_jerk_threshold
-    direction_threshold = config.musical_direction_threshold
-    velocity_threshold  = config.musical_velocity_threshold
+    direction_threshold = 0.03
+    velocity_threshold  = 0.4
 
     # Abrir vídeo (una sola pasada, sin loop)
     cap = cv2.VideoCapture(source)

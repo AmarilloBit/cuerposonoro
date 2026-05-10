@@ -125,7 +125,9 @@ class VideoFileCamera(BaseCamera):
             loop: If True, restart the video when it ends. Default True.
             realtime: If True, throttle reads to match the source FPS so
                 downstream listeners (e.g., MIDI synth) hear the same timing
-                a live performer would produce. Default True.
+                a live performer would produce. When the pipeline is slower
+                than source FPS, frames are skipped (via grab()) so wall-clock
+                pacing stays tied to the original timeline. Default True.
         """
         self._path = path
         self._loop = loop
@@ -133,6 +135,7 @@ class VideoFileCamera(BaseCamera):
         self._cap = self._open()
         self._frame_period = 1.0 / self._fps if self._realtime and self._fps > 0 else 0.0
         self._next_frame_at = time.perf_counter()
+        self._skipped_frames = 0
 
     def _open(self) -> cv2.VideoCapture:
         cap = cv2.VideoCapture(self._path)
@@ -156,21 +159,32 @@ class VideoFileCamera(BaseCamera):
         Read the next frame. If the video ends and loop=True, restart from
         the beginning. If loop=False, return None to signal end of input.
 
-        When realtime=True, blocks until the source FPS pacing allows the
-        next frame.
+        When realtime=True:
+          - If the pipeline is faster than source FPS, sleep to match.
+          - If the pipeline is slower than source FPS, skip ahead in the
+            video (via cap.grab(), which decodes without copying to Python)
+            so wall-clock pacing stays tied to the original timeline.
         """
         if self._frame_period > 0.0:
             now = time.perf_counter()
             sleep_for = self._next_frame_at - now
             if sleep_for > 0:
                 time.sleep(sleep_for)
-            self._next_frame_at = max(self._next_frame_at, now) + self._frame_period
+                self._next_frame_at += self._frame_period
+            else:
+                frames_behind = int(-sleep_for / self._frame_period)
+                for _ in range(frames_behind):
+                    if not self._cap.grab():
+                        break
+                    self._skipped_frames += 1
+                self._next_frame_at = now + self._frame_period
 
         ret, frame = self._cap.read()
 
         if not ret:
             if self._loop:
                 self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                self._next_frame_at = time.perf_counter() + self._frame_period
                 ret, frame = self._cap.read()
                 if not ret:
                     return None
@@ -184,4 +198,10 @@ class VideoFileCamera(BaseCamera):
 
     def release(self):
         self._cap.release()
-        print("[VideoFileCamera] Released.")
+        if self._skipped_frames > 0:
+            print(
+                f"[VideoFileCamera] Released. "
+                f"Frames skipped to maintain realtime: {self._skipped_frames}."
+            )
+        else:
+            print("[VideoFileCamera] Released.")

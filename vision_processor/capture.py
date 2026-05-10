@@ -22,6 +22,8 @@ Usage:
     camera.release()
 """
 
+import time
+
 import cv2
 import numpy as np
 from abc import ABC, abstractmethod
@@ -116,15 +118,21 @@ class VideoFileCamera(BaseCamera):
     needing a live camera.
     """
 
-    def __init__(self, path: str, loop: bool = True):
+    def __init__(self, path: str, loop: bool = True, realtime: bool = True):
         """
         Args:
             path: Path to the video file (mp4, avi, mov, etc.)
             loop: If True, restart the video when it ends. Default True.
+            realtime: If True, throttle reads to match the source FPS so
+                downstream listeners (e.g., MIDI synth) hear the same timing
+                a live performer would produce. Default True.
         """
         self._path = path
         self._loop = loop
+        self._realtime = realtime
         self._cap = self._open()
+        self._frame_period = 1.0 / self._fps if self._realtime and self._fps > 0 else 0.0
+        self._next_frame_at = time.perf_counter()
 
     def _open(self) -> cv2.VideoCapture:
         cap = cv2.VideoCapture(self._path)
@@ -134,12 +142,12 @@ class VideoFileCamera(BaseCamera):
                 "Check that the file exists and the format is supported."
             )
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        fps = cap.get(cv2.CAP_PROP_FPS)
+        self._fps = cap.get(cv2.CAP_PROP_FPS)
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print(
             f"[VideoFileCamera] file={self._path} | "
-            f"resolution={w}x{h} | fps={fps:.1f} | frames={total} | loop={self._loop}"
+            f"resolution={w}x{h} | fps={self._fps:.1f} | frames={total} | loop={self._loop}"
         )
         return cap
 
@@ -147,12 +155,21 @@ class VideoFileCamera(BaseCamera):
         """
         Read the next frame. If the video ends and loop=True, restart from
         the beginning. If loop=False, return None to signal end of input.
+
+        When realtime=True, blocks until the source FPS pacing allows the
+        next frame.
         """
+        if self._frame_period > 0.0:
+            now = time.perf_counter()
+            sleep_for = self._next_frame_at - now
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+            self._next_frame_at = max(self._next_frame_at, now) + self._frame_period
+
         ret, frame = self._cap.read()
 
         if not ret:
             if self._loop:
-                # Restart from the beginning
                 self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 ret, frame = self._cap.read()
                 if not ret:

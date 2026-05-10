@@ -62,7 +62,7 @@ class ClassicMidiSender(BaseMidiSender):
     MELODY_LEFT_BASE  = 72   # C5
 
     JERK_THRESHOLD      = 0.4
-    HIP_TILT_THRESHOLD  = 0.6
+    HIP_TILT_THRESHOLD  = 0.2
 
     def __init__(self, port_name: str = "CuerpoSonoro"):
         self.port_name = port_name

@@ -255,20 +255,22 @@ class TestMidiSender:
     # --- Knee angle → chord velocity ---
 
     def test_straight_knees_high_velocity(self, sender):
+        """kneeAngle=1.0 should sit near CHORD_VELOCITY_MAX (currently 55)."""
         features = self._default_features(feetCenterX=0.10, kneeAngle=1.0)
         sender.update(features)
 
         sent = sender._mock_port.send.call_args_list
         velocities = [c[0][0].velocity for c in sent if c[0][0].type == "note_on"]
-        assert all(v > 100 for v in velocities)
+        assert all(v >= 50 for v in velocities)
 
     def test_bent_knees_low_velocity(self, sender):
+        """kneeAngle=0.0 should sit near CHORD_VELOCITY_MIN (currently 15)."""
         features = self._default_features(feetCenterX=0.10, kneeAngle=0.0)
         sender.update(features)
 
         sent = sender._mock_port.send.call_args_list
         velocities = [c[0][0].velocity for c in sent if c[0][0].type == "note_on"]
-        assert all(v < 60 for v in velocities)
+        assert all(v <= 20 for v in velocities)
 
     # --- Hip tilt → pitch bend ---
 

@@ -47,7 +47,7 @@ features:
 
 output:
   mode: osc                 # "osc" or "midi"
-  midi_mode: classic        # "classic" or "musical" (only used when mode: midi)
+  midi_mode: classic        # "classic" or "rhythmical" (only used when mode: midi)
 
 
 # OSC (SuperCollider)

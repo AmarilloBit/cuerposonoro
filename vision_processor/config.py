@@ -204,14 +204,14 @@ class Config:
     def midi_mode(self) -> str:
         return self.get("output.midi_mode", "classic")
 
-    # Musical sender settings (percussive pentatonic mode)
+    # Rhythmical sender settings (percussive pentatonic mode)
     @property
-    def musical_tempo_bpm(self) -> int:
-        return self.get("musical.tempo_bpm", 120)
+    def rhythmical_tempo_bpm(self) -> int:
+        return self.get("rhythmical.tempo_bpm", 120)
 
     @property
-    def musical_melody_trigger_threshold(self) -> float:
-        return self.get("musical.melody_trigger_threshold", 0.08)
+    def rhythmical_melody_velocity_floor(self) -> float:
+        return self.get("rhythmical.melody_velocity_floor", 0.05)
 
     # Camera profiles
     @property
@@ -396,7 +396,7 @@ class Config:
         Create the appropriate sender based on output.mode and output.midi_mode.
 
         Returns:
-            OSCSender, ClassicMidiSender, or MusicalMidiSender instance.
+            OSCSender, ClassicMidiSender, or RhythmicalMidiSender instance.
         """
         mode = self.output_mode
 
@@ -407,12 +407,12 @@ class Config:
         elif mode == "midi":
             midi_mode = self.midi_mode
 
-            if midi_mode == "musical":
-                from vision_processor.midi.musical import MusicalMidiSender
-                return MusicalMidiSender(
+            if midi_mode == "rhythmical":
+                from vision_processor.midi.rhythmical import RhythmicalMidiSender
+                return RhythmicalMidiSender(
                     port_name=self.midi_port_name,
-                    tempo_bpm=self.musical_tempo_bpm,
-                    melody_trigger_threshold=self.musical_melody_trigger_threshold,
+                    tempo_bpm=self.rhythmical_tempo_bpm,
+                    melody_velocity_floor=self.rhythmical_melody_velocity_floor,
                 )
             else:
                 from vision_processor.midi.classic import ClassicMidiSender

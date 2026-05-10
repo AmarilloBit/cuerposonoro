@@ -7,7 +7,7 @@ All existing imports and tests use:
 This file keeps that working without any changes to those files.
 New code should import directly from the midi subpackage:
     from vision_processor.midi.classic import ClassicMidiSender
-    from vision_processor.midi.musical import MusicalMidiSender
+    from vision_processor.midi.rhythmical import RhythmicalMidiSender
 """
 
 from vision_processor.midi.classic import ClassicMidiSender as MidiSender

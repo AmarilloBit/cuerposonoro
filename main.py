@@ -149,7 +149,7 @@ def _parse_args():
     parser.add_argument(
         "--midi-mode",
         type=str,
-        choices=["classic", "musical"],
+        choices=["classic", "rhythmical"],
         default=None,
         dest="midi_mode",
         help="Override output.midi_mode from config.yaml (only used when --mode midi).",

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# record-musical.sh — Calibration recording helper for Cuerpo Sonoro (musical
-# mode: tempo-quantized, chord-tone melody).
+# record-rhythmical.sh — Calibration recording helper for Cuerpo Sonoro
+# (rhythmical mode: percussive pentatonic, all 17 kinematic features mapped).
 #
 # WHAT IT DOES
 #   1. Verifies that BlackHole and switchaudio-osx are installed.
@@ -10,16 +10,19 @@
 #      can capture it via BlackHole).
 #   3. Waits for you to start a macOS Screen Recording (Cmd+Shift+5) with
 #      BlackHole 2ch as the microphone source.
-#   4. Runs `main.py` against the calibration video in MIDI/musical/debug mode,
-#      with --no-loop so it exits after a single pass.
+#   4. Runs `main.py` against the calibration video in MIDI/rhythmical/debug
+#      mode, with --no-loop so it exits after a single pass.
 #   5. Restores your previous audio output device on exit.
 #
 # WHAT YOU MUST DO ONCE, MANUALLY, BEFORE THE FIRST RUN
 #   - Create a Multi-Output Device in Audio MIDI Setup named exactly
 #       'CuerpoSonoro-Record'
 #     containing BlackHole 2ch + your speakers.
-#   - In Surge XT: enable MPE, set Output = CuerpoSonoro-Record, load an MPE
-#     patch (e.g. 'Bloom').
+#   - In Surge XT: load a percussive patch (mallet, koto, kalimba, plucked
+#     synth — sustained pads like 'Bloom' don't fit; the sender emits ~90ms
+#     notes and you'd only hear the attack envelope). Set Output =
+#     CuerpoSonoro-Record. The patch should listen on channels 2-4 (bass,
+#     right melody, left melody); a single patch in omni mode works.
 #   - Grant Screen Recording permission to the screenshot tool: System Settings
 #     > Privacy & Security > Screen Recording > enable for 'Screenshot' (or
 #     'Captura de pantalla'). Required only the first time.
@@ -28,7 +31,7 @@
 #     Surge XT should remember this for subsequent runs.
 #
 # USAGE
-#   ./calibration/record-musical.sh [path/to/video.mp4]
+#   ./calibration/record-rhythmical.sh [path/to/video.mp4]
 #
 #   Defaults to calibration/clasx2.mp4 if no path is given.
 # =============================================================================
@@ -140,7 +143,7 @@ cd "$REPO_ROOT"
 python main.py \
     --source "$VIDEO_PATH" \
     --mode midi \
-    --midi-mode musical \
+    --midi-mode rhythmical \
     --backend metal \
     --debug \
     --no-loop

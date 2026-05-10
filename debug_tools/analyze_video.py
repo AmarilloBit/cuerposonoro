@@ -10,7 +10,7 @@ Procesa un vídeo sin abrir ventana gráfica y genera:
 
 Uso:
     python debug_tools/analyze_video.py --source /ruta/al/video.mov --midi-mode classic
-    python debug_tools/analyze_video.py --source /ruta/al/video.mov --midi-mode musical
+    python debug_tools/analyze_video.py --source /ruta/al/video.mov --midi-mode rhythmical
     python debug_tools/analyze_video.py --source /ruta/al/video.mov --midi-mode classic --out debug_output/
 """
 
@@ -168,11 +168,14 @@ class InstrumentedClassicSender:
                         self.melody_left_note = None
 
 
-class InstrumentedMusicalSender:
+class InstrumentedRhythmicalSender:
     """
-    Replica la lógica de MusicalMidiSender (sin hilo de tempo) para análisis.
-    Las notas se 'disparan' en el mismo frame en que se encolarían, ya que
-    no hay hilo de tempo real en el análisis offline.
+    Análisis offline para el modo rhythmical. NOTA: esta clase todavía
+    refleja la arquitectura LEGACY (chord-tones + dirección de mano), no
+    la actual (pentatónica percutiva con todas las features). Pendiente de
+    reescribir — ver TODO en `_analyze_video`. Las notas se 'disparan' en
+    el mismo frame en que se encolarían, ya que no hay hilo de tempo real
+    en el análisis offline.
     """
 
     CHORD_TONES = {
@@ -323,20 +326,21 @@ def analyze(source: str, midi_mode: str, output_dir: str):
     pose_estimator    = config.create_pose_estimator()
     feature_extractor = FeatureExtractor()
 
-    if midi_mode == "musical":
-        # TODO: InstrumentedMusicalSender still mirrors the OLD musical
-        # sender (chord-tones + direction-based melody). The live
-        # MusicalMidiSender has been rewritten to a percussive
-        # pentatonic architecture; this analyzer no longer reflects
-        # what the live pipeline produces. Until it's rewritten, the
-        # thresholds below are the defaults of the legacy logic.
-        sender = InstrumentedMusicalSender()
+    if midi_mode == "rhythmical":
+        # TODO: InstrumentedRhythmicalSender still mirrors the OLD
+        # chord-tones + direction-based-melody architecture. The live
+        # RhythmicalMidiSender has been rewritten to a percussive
+        # pentatonic design that uses all 17 kinematic features; this
+        # analyzer no longer reflects what the live pipeline produces.
+        # Until it's rewritten, the thresholds below are the defaults
+        # of the legacy logic.
+        sender = InstrumentedRhythmicalSender()
     else:
         sender = InstrumentedClassicSender()
         sender.JERK_THRESHOLD = config.midi_jerk_threshold
 
-    # Threshold values for plotting / analysis. The musical thresholds
-    # are the legacy defaults baked into InstrumentedMusicalSender.
+    # Threshold values for plotting / analysis. The rhythmical thresholds
+    # are the legacy defaults baked into InstrumentedRhythmicalSender.
     jerk_threshold      = config.midi_jerk_threshold
     direction_threshold = 0.03
     velocity_threshold  = 0.4
@@ -410,8 +414,8 @@ def analyze(source: str, midi_mode: str, output_dir: str):
                 "feetCenterX":   round(features.get("feetCenterX", 0), 4),
             })
 
-        # Triggers de dirección para musical
-        if midi_mode == "musical" and sender.prev_hand_y is not None:
+        # Triggers de dirección para rhythmical (legacy analyzer behaviour)
+        if midi_mode == "rhythmical" and sender.prev_hand_y is not None:
             dy = features.get("rightHandY", 0.5) - sender.prev_hand_y
             if abs(dy) > direction_threshold:
                 all_triggers.append({
@@ -559,7 +563,7 @@ def _parse_args():
     parser.add_argument("--source", required=True,
                         help="Ruta al vídeo (e.g. /Users/mara/CuerpoSonoro/video.mov)")
     parser.add_argument("--midi-mode", dest="midi_mode",
-                        choices=["classic", "musical"], default="classic",
+                        choices=["classic", "rhythmical"], default="classic",
                         help="Modo MIDI a analizar (default: classic)")
     parser.add_argument("--out", default=None,
                         help="Carpeta de salida (default: debug_tools/debug_output/<nombre_video>/)")

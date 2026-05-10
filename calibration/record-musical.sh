@@ -30,7 +30,7 @@
 # USAGE
 #   ./calibration/record-musical.sh [path/to/video.mp4]
 #
-#   Defaults to calibration/musicalx2.mp4 if no path is given.
+#   Defaults to calibration/clasx2.mp4 if no path is given.
 # =============================================================================
 
 set -euo pipefail
@@ -40,7 +40,7 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VIDEO_PATH="${1:-${REPO_ROOT}/calibration/musicalx2.mp4}"
+VIDEO_PATH="${1:-${REPO_ROOT}/calibration/clasx2.mp4}"
 AUDIO_DEVICE_NAME="CuerpoSonoro-Record"
 VENV_ACTIVATE="${REPO_ROOT}/.venv/bin/activate"
 

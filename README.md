@@ -15,10 +15,9 @@ Cuerpo Sonoro captures human body movement through computer vision and translate
 - [Overview](#overview)
 - [Architecture](#architecture)
   - [Pose Estimation Backends](#pose-estimation-backends)
-- [MPE Features & Musical Mapping](#mpe-features--musical-mapping)
-  - [Chords (Lower Body)](#chords-lower-body)
-  - [Melody (Upper Body)](#melody-upper-body)
-  - [Global Controls](#global-controls)
+- [MIDI Modes](#midi-modes)
+  - [Classic mode](#classic-mode)
+  - [Rhythmical mode](#rhythmical-mode)
   - [Feature Reference Table](#feature-reference-table)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
@@ -32,6 +31,7 @@ Cuerpo Sonoro captures human body movement through computer vision and translate
   - [Linux (Ubuntu / Debian)](#linux-ubuntu--debian)
   - [NVIDIA Jetson (Orin Nano)](#nvidia-jetson-orin-nano)
   - [Running modes](#running-modes)
+  - [Calibration recording](#calibration-recording)
   - [Running tests (no hardware required)](#running-tests-no-hardware-required)
 - [Configuration](#configuration)
 - [Debug Tools](#debug-tools)
@@ -132,11 +132,22 @@ The `tensorrt.py` backend stub remains in the repository for reference but is no
 
 ---
 
-## MPE Features & Musical Mapping
+## MIDI Modes
 
-The system extracts a set of kinematic and postural descriptors from body landmarks and maps them to musical parameters using the MPE (MIDI Polyphonic Expression) paradigm. The body is divided into three zones: lower body controls harmony, upper body controls melody, and head/global motion controls effects.
+The MIDI output ships in two modes with deliberately distinct sonic identities. Both consume the same 17 kinematic features extracted by `FeatureExtractor`, but they map them to very different musical structures.
 
-### Chords (Lower Body)
+| Mode | Character | Patch in Surge XT |
+|------|-----------|-------------------|
+| `classic` | MPE-expressive, harmony-led: chord pad driven by lower body, two-voice melody on jerk triggers from the hands | Sustained MPE pad (e.g. Bloom) |
+| `rhythmical` | Percussive pentatonic, rhythm-led: single bass pulse, two short melody voices, **stillness produces silence** | Percussive (mallet, koto, kalimba, plucked synth) |
+
+Pick one with `--midi-mode classic|rhythmical` (CLI) or `output.midi_mode` (in `config.yaml`).
+
+### Classic mode
+
+Body divided into three zones: lower body controls harmony, upper body controls melody, head/global motion controls effects. Notes do not sound continuously — they are triggered when sudden hand movement (high jerk) is detected. Pair with a sustained MPE pad in Surge XT.
+
+#### Chords (Lower Body)
 
 **1. Chord Selection — Foot position on X axis (`feetCenterX`)**
 
@@ -150,7 +161,7 @@ The lateral tilt of the hips controls two things: pitch bend (subtle detuning th
 
 The knee flexion angle controls volume. Extended legs mean maximum volume. Bending the knees progressively reduces volume. This allows natural crescendos and diminuendos with the body.
 
-### Melody (Upper Body)
+#### Melody (Upper Body)
 
 **4. Right hand melodic note — Right hand Y height (`rightHandY`)**
 
@@ -172,7 +183,7 @@ The speed at which the arm moves during a gesture determines two things: MIDI ve
 
 The angle formed by the arm relative to the torso (measured between elbow and hip) controls pitch bend on melodic notes. Arm close to the body means a stable note. Extended arm applies glissando. Oscillating elbow movement generates vibrato.
 
-### Global Controls
+#### Global Controls
 
 **9. Global frequency filter — Head tilt (`headTilt`)**
 
@@ -182,22 +193,65 @@ The lateral tilt of the head controls a global frequency filter that affects all
 
 The overall motion energy of the body is sent to SuperCollider to control background textures and drones that complement the melodic and harmonic MPE output.
 
+### Rhythmical mode
+
+A rhythm-first, harmony-light identity that uses **all 17 kinematic features**. Notes are forced to ~90ms regardless of the synth patch's release envelope, producing percussive hits rather than sustained tones. **Stillness produces total silence** — `energy` below the gate threshold mutes every channel, making "rest" a meaningful expressive choice.
+
+The fixed scale is **A Hirajōshi pentatonic** (A B C E F), so the listener's attention goes to rhythm rather than tracking harmonic motion. Bass plays a single note (A2) re-triggered on a tick pattern; both hands drive independent melody voices on separate MIDI channels.
+
+The tempo thread fires at 1/16 (max granularity for the densest bass pattern). Bass density patterns include `1/4`, `1/8`, and a `3+3+2` afro-cuban tresillo. A position-based velocity accent table (downbeat +25, half-bar +10, off-beats -5, ghost notes -15) produces groove from velocity alone, without changing any pitches.
+
+Pair with a percussive Surge XT patch (mallet, koto, kalimba, plucked synth). MPE channel layout: master (CC0), bass (CH1), right melody (CH2), left melody (CH3) — a single patch in omni mode is fine, multiple instances or layers across the channels give more contrast.
+
+#### All 17 features → audible behaviour
+
+| # | Feature              | Routing                                                          |
+|---|----------------------|------------------------------------------------------------------|
+| 1 | `energy`             | Master gate — silence below `ENERGY_GATE`; scales global velocity 0.4×–1.2× above |
+| 2 | `symmetry`           | CC10 (pan) on master                                             |
+| 3 | `smoothness`         | CC1 (mod wheel) on master                                        |
+| 4 | `armAngle`           | CC11 (expression) on master                                      |
+| 5 | `verticalExtension`  | Global ±12 semitone octave shift on bass + melody                |
+| 6 | `feetCenterX`        | Bass density pattern (1/4, 1/8, 3+3+2 syncopated)                |
+| 7 | `hipTilt`            | Pitch bend on bass channel                                       |
+| 8 | `kneeAngle`          | Bass-only octave shift (bent → -12)                              |
+| 9 | `rightHandY`         | Index in Hirajōshi scale → right melody pitch                    |
+| 10 | `leftHandY`         | Index in Hirajōshi scale → left melody pitch                     |
+| 11 | `rightHandJerk`     | Off-grid accent on right melody (rising-edge triggered)          |
+| 12 | `leftHandJerk`      | Off-grid accent on left melody (rising-edge triggered)           |
+| 13 | `rightArmVelocity`  | Right melody density tier (1, 2, 4, or 8 hits/bar) + velocity    |
+| 14 | `leftArmVelocity`   | Left melody density tier (1, 2, 4, or 8 hits/bar) + velocity     |
+| 15 | `rightElbowHipAngle` | Pitch bend on right melody channel                              |
+| 16 | `leftElbowHipAngle`  | Pitch bend on left melody channel                               |
+| 17 | `headTilt`          | CC74 (filter cutoff) on master                                   |
+
+The `armVelocity` density tiers map perceived hand activity directly to melodic information density: a slow lyrical movement produces 1 note per bar, a frantic gesture produces 8. Stillness leaves both hands silent.
+
+`rightHandJerk` / `leftHandJerk` use rising-edge detection so sustained jerky motion doesn't spam notes — the accent fires once per crossing of the threshold, giving the dancer punctuation without flooding the channel.
+
 ### Feature Reference Table
 
-| Feature | Landmarks Used | Output Range |
-|---------|---------------|-------------|
-| `feetCenterX` | Ankles (27, 28) | 0.0 – 1.0 |
-| `hipTilt` | Hips (23, 24) | -1.0 – 1.0 |
-| `kneeAngle` | Hip, knee, ankle (23/24, 25/26, 27/28) | 0.0 – 1.0 |
-| `rightHandY` | Right wrist (16) | 0.0 – 1.0 |
-| `leftHandY` | Left wrist (15) | 0.0 – 1.0 |
-| `rightHandJerk` | Right wrist (16) velocity | 0.0 – 1.0 |
-| `leftHandJerk` | Left wrist (15) velocity | 0.0 – 1.0 |
-| `rightArmVelocity` | Right wrist (16) | 0.0 – 1.0 |
-| `leftArmVelocity` | Left wrist (15) | 0.0 – 1.0 |
-| `rightElbowHipAngle` | Shoulder, elbow, hip (12, 14, 24) | 0.0 – 1.0 |
-| `leftElbowHipAngle` | Shoulder, elbow, hip (11, 13, 23) | 0.0 – 1.0 |
-| `headTilt` | Ears (7, 8) | -1.0 – 1.0 |
+All 17 features extracted by `vision_processor/features.py`:
+
+| # | Feature | Landmarks Used | Output Range |
+|---|---------|---------------|-------------|
+| 1 | `energy` | All landmarks (frame-to-frame motion magnitude) | 0.0 – 1.0 |
+| 2 | `symmetry` | Wrists (15, 16) | -1.0 – 1.0 |
+| 3 | `smoothness` | Wrists (15, 16) frame-to-frame jerk | 0.0 – 1.0 |
+| 4 | `armAngle` | Shoulders + wrists (11, 12, 15, 16) elevation | 0.0 – 1.0 |
+| 5 | `verticalExtension` | Full body height (head to ankles) | 0.0 – 1.0 |
+| 6 | `feetCenterX` | Ankles (27, 28) | 0.0 – 1.0 |
+| 7 | `hipTilt` | Hips (23, 24) | -1.0 – 1.0 |
+| 8 | `kneeAngle` | Hip, knee, ankle (23/24, 25/26, 27/28) | 0.0 – 1.0 |
+| 9 | `rightHandY` | Right wrist (16) | 0.0 – 1.0 |
+| 10 | `leftHandY` | Left wrist (15) | 0.0 – 1.0 |
+| 11 | `rightHandJerk` | Right wrist (16) velocity | 0.0 – 1.0 |
+| 12 | `leftHandJerk` | Left wrist (15) velocity | 0.0 – 1.0 |
+| 13 | `rightArmVelocity` | Right wrist (16) | 0.0 – 1.0 |
+| 14 | `leftArmVelocity` | Left wrist (15) | 0.0 – 1.0 |
+| 15 | `rightElbowHipAngle` | Shoulder, elbow, hip (12, 14, 24) | 0.0 – 1.0 |
+| 16 | `leftElbowHipAngle` | Shoulder, elbow, hip (11, 13, 23) | 0.0 – 1.0 |
+| 17 | `headTilt` | Ears (7, 8) | -1.0 – 1.0 |
 
 ---
 
@@ -349,6 +403,7 @@ python main.py --mode midi
 | `--debug` | Show feature values and skeleton overlay on the video window |
 | `--mode osc\|midi` | Override `output.mode` from `config.yaml` |
 | `--midi-mode classic\|rhythmical` | Override `output.midi_mode` (only used when `--mode midi`) |
+| `--no-loop` | When using `--source`, exit at end of file instead of looping. Useful for one-shot calibration recordings |
 
 ### Launcher (GUI)
 
@@ -424,6 +479,34 @@ python3 main.py --backend cpu --debug
 | MIDI classic | Surge XT | `python main.py --mode midi --midi-mode classic` |
 | MIDI rhythmical | Surge XT | `python main.py --mode midi --midi-mode rhythmical` |
 | Video file (debug) | any | `python main.py --source path/to/video.mp4 --debug` |
+
+---
+
+### Calibration recording
+
+For comparing how each MIDI mode sounds against a reference dance video, the `calibration/` folder ships two helper scripts that orchestrate a one-pass recording end-to-end:
+
+```
+./calibration/record-classic.sh     [path/to/video.mp4]
+./calibration/record-rhythmical.sh  [path/to/video.mp4]
+```
+
+Each script:
+
+1. Verifies that BlackHole 2ch and `SwitchAudioSource` are installed and that a Multi-Output Device named `CuerpoSonoro-Record` exists in Audio MIDI Setup.
+2. Switches macOS audio output to `CuerpoSonoro-Record` (restored on exit via `trap EXIT INT TERM`).
+3. Prompts the operator to start a macOS Screen Recording (`Cmd+Shift+5` → Record Selected Portion → Microphone = `BlackHole 2ch` → drag selection → Record).
+4. Reads `Enter`, then runs `main.py` with `--no-loop --backend metal --debug` against the calibration video.
+5. On `Pipeline finished.`, instructs the operator to stop the screen recording. The `.mov` is saved wherever the operator selected in the screen-recording options.
+
+Both scripts default to `calibration/clasx2.mp4` if no path is given.
+
+#### One-time setup
+
+- **Audio MIDI Setup**: create a Multi-Output Device named exactly `CuerpoSonoro-Record` containing BlackHole 2ch + your speakers. Required so the screen recorder picks up Surge XT via BlackHole while you still hear it through the speakers.
+- **Surge XT**: set output to `CuerpoSonoro-Record`. For classic mode load a sustained MPE pad (Bloom). For rhythmical mode load a percussive patch (mallet, koto, kalimba, plucked synth) — sustained pads will only emit attack envelopes since notes are forced to ~90ms.
+- **System Settings → Privacy & Security → Screen Recording**: grant permission to `Captura de pantalla` / `Screenshot` (first run only).
+- **Surge XT → Options → Audio/MIDI Settings**: tick `CuerpoSonoro` under Active MIDI Inputs (first run only; remembered after).
 
 ---
 

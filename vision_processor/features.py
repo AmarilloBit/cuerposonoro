@@ -1,9 +1,9 @@
 """
 Feature extraction from pose landmarks.
 
-Computes 19 kinematic descriptors per frame from MediaPipe's 33
+Computes 17 kinematic descriptors per frame from MediaPipe's 33
 landmarks: postural angles, velocities, jerks, body symmetry, vertical
-extension, hand position, head tilt, pelvis thrust and spine lean.
+extension, hand position and head tilt.
 
 All descriptors are exponentially smoothed (alpha = 0.3), except for
 jerk and arm-velocity descriptors which require their original peak
@@ -68,10 +68,6 @@ class FeatureExtractor:
 
             # Global expression
             "headTilt": self._calculate_head_tilt(landmarks),
-
-            # Blueprint mode descriptors
-            "pelvis_thrust": self._calculate_pelvis_thrust(landmarks),
-            "spine_lean": self._calculate_spine_lean(landmarks),
         }
 
         # Apply temporal smoothing
@@ -348,30 +344,6 @@ class FeatureExtractor:
 
     # FEATURES - MIDI - Global Expression (Utility methods)
 
-    def _calculate_pelvis_thrust(self, landmarks: list) -> float:
-        """
-        Horizontal displacement of hip midpoint relative to ankle midpoint,
-        normalised to torso height. Positive = hips in front of feet.
-        Range: [-1.0, 1.0].
-        """
-        hip_mid_x = (landmarks[23]["x"] + landmarks[24]["x"]) / 2
-        ankle_mid_x = (landmarks[27]["x"] + landmarks[28]["x"]) / 2
-        torso_height = abs(landmarks[11]["y"] - landmarks[23]["y"]) + 1e-6
-        thrust = (hip_mid_x - ankle_mid_x) / torso_height
-        return max(-1.0, min(1.0, thrust))
-
-    def _calculate_spine_lean(self, landmarks: list) -> float:
-        """
-        Horizontal displacement of shoulder midpoint relative to hip midpoint,
-        normalised to torso height. Positive = shoulders in front of hips.
-        Range: [-1.0, 1.0].
-        """
-        shoulder_mid_x = (landmarks[11]["x"] + landmarks[12]["x"]) / 2
-        hip_mid_x = (landmarks[23]["x"] + landmarks[24]["x"]) / 2
-        torso_height = abs(landmarks[11]["y"] - landmarks[23]["y"]) + 1e-6
-        lean = (shoulder_mid_x - hip_mid_x) / torso_height
-        return max(-1.0, min(1.0, lean))
-
     def _calculate_head_tilt(self, landmarks: list) -> float:
         """
         Lateral head tilt for global filter control.
@@ -426,6 +398,4 @@ class FeatureExtractor:
             "rightElbowHipAngle": 0.0,
             "leftElbowHipAngle": 0.0,
             "headTilt": 0.0,
-            "pelvis_thrust": 0.0,
-            "spine_lean": 0.0,
         }

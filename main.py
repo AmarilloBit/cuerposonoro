@@ -149,24 +149,10 @@ def _parse_args():
     parser.add_argument(
         "--midi-mode",
         type=str,
-        choices=["classic", "musical", "blueprint"],
+        choices=["classic", "musical"],
         default=None,
         dest="midi_mode",
         help="Override output.midi_mode from config.yaml (only used when --mode midi).",
-    )
-    parser.add_argument(
-        "--genre",
-        type=str,
-        default=None,
-        help="Genre folder name for blueprint mode (e.g. 'Neo-Soul', 'Jazz'). "
-             "Case-insensitive. Ignored when --midi-mode is not blueprint.",
-    )
-    parser.add_argument(
-        "--key",
-        type=str,
-        default=None,
-        help="Key name for blueprint mode (e.g. 'D Major', 'B Minor'). "
-             "Case-insensitive. Ignored when --midi-mode is not blueprint.",
     )
     parser.add_argument(
         "--backend",
@@ -195,10 +181,6 @@ def main():
         overrides["pose.backend"] = args.backend
 
     config = Config(overrides=overrides if overrides else None)
-
-    # Store blueprint CLI args on config for create_sender()
-    config._blueprint_genre = getattr(args, "genre", None)
-    config._blueprint_key = getattr(args, "key", None)
 
     print(f"[main] Config: {config.describe()}")
     if args.source:
@@ -267,15 +249,7 @@ def main():
 
                 # Collect MIDI state for debug overlay
                 if args.debug and config.output_mode == "midi":
-                    if config.midi_mode == "blueprint" and hasattr(sender, "debug_info"):
-                        bp = sender.debug_info()
-                        midi_state = {
-                            "chord": f"{bp['genre']} | {bp['key']} | "
-                                     f"chord {bp['chord_index']}/{bp['total_chords']}",
-                            "melody_right": bp["filename"],
-                            "melody_left": "rotation ON" if bp["genre_rotation_active"] else "rotation OFF",
-                        }
-                    elif hasattr(sender, "current_chord"):
+                    if hasattr(sender, "current_chord"):
                         midi_state = {
                             "chord": sender.current_chord or "---",
                             "melody_right": getattr(sender, "melody_right_note", "---") or "---",

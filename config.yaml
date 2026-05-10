@@ -47,20 +47,7 @@ features:
 
 output:
   mode: osc                 # "osc" or "midi"
-  midi_mode: classic        # "classic", "musical", or "blueprint" (only used when mode: midi)
-  blueprint:
-    silence_timeout: 60          # seconds before genre rotation
-    pelvis_threshold: 0.12       # normalised pelvis thrust to trigger chord change
-    chord_change_cooldown: 1.2   # seconds between chord changes
-    silence_threshold: 0.02      # velocity threshold for silence detection
-    silence_hold_ms: 500         # ms below threshold before all-notes-off
-    midi_channel_melody: 5       # MPE channel for melody (0-indexed)
-    midi_channel_bass: 6         # MPE channel for bass (0-indexed)
-    midi_channel_master: 0       # MPE master channel (0-indexed)
-    assets_path: "assets/midi"   # path to Unison MIDI Blueprint library
-    arm_velocity_threshold: 0.08 # arm velocity to trigger melody note (max of L/R)
-    melody_cooldown: 0.15        # seconds between melody note triggers
-    melody_bend_scale: 4.0       # scale factor for per-note pitch bend
+  midi_mode: classic        # "classic" or "musical" (only used when mode: midi)
 
 
 # OSC (SuperCollider)

@@ -16,39 +16,10 @@ from tkinter import filedialog, ttk
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_SCRIPT = os.path.join(ROOT_DIR, "main.py")
-CALIBRATE_SCRIPT = os.path.join(ROOT_DIR, "calibrate.py")
-ASSETS_MIDI = os.path.join(ROOT_DIR, "assets", "midi")
 
 MODES = ["osc", "midi"]
-MIDI_MODES = ["classic", "musical", "blueprint"]
+MIDI_MODES = ["classic", "musical"]
 BACKENDS = ["auto", "cpu", "metal", "tensorrt"]
-
-
-def _scan_genres() -> list[str]:
-    """Scan assets/midi/ for genre folder names."""
-    if not os.path.isdir(ASSETS_MIDI):
-        return []
-    return sorted(
-        d for d in os.listdir(ASSETS_MIDI)
-        if os.path.isdir(os.path.join(ASSETS_MIDI, d)) and not d.startswith(".")
-    )
-
-
-def _scan_keys(genre: str) -> list[str]:
-    """Scan a genre folder for key subfolder names (cleaned)."""
-    genre_path = os.path.join(ASSETS_MIDI, genre)
-    if not os.path.isdir(genre_path):
-        return []
-    keys = []
-    for folder in sorted(os.listdir(genre_path)):
-        if os.path.isdir(os.path.join(genre_path, folder)):
-            # Extract key from "01 - C Major - A Minor"
-            parts = folder.split(" - ", 1)
-            if len(parts) > 1:
-                keys.append(parts[1])
-            else:
-                keys.append(folder)
-    return keys
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +32,6 @@ class LauncherApp:
         self.root.title("Cuerpo Sonoro — Launcher")
         self.root.resizable(False, False)
 
-        self.genres = _scan_genres()
         self.process: subprocess.Popen | None = None
 
         self._build_ui()
@@ -90,46 +60,12 @@ class LauncherApp:
         # -- MIDI mode ------------------------------------------------------
         self.midi_mode_label = ttk.Label(frame, text="MIDI mode:")
         self.midi_mode_label.grid(row=row, column=0, sticky="w", **pad)
-        self.midi_mode_var = tk.StringVar(value="blueprint")
+        self.midi_mode_var = tk.StringVar(value="classic")
         self.midi_mode_combo = ttk.Combobox(
             frame, textvariable=self.midi_mode_var, values=MIDI_MODES,
             state="readonly", width=22,
         )
         self.midi_mode_combo.grid(row=row, column=1, sticky="w", **pad)
-        self.midi_mode_combo.bind("<<ComboboxSelected>>", lambda _: self._on_midi_mode_change())
-        row += 1
-
-        # -- Separator: Blueprint options -----------------------------------
-        self.bp_sep = ttk.Separator(frame, orient="horizontal")
-        self.bp_sep.grid(row=row, column=0, columnspan=3, sticky="ew", pady=8)
-        row += 1
-
-        self.bp_label = ttk.Label(frame, text="Blueprint options", font=("TkDefaultFont", 0, "bold"))
-        self.bp_label.grid(row=row, column=0, columnspan=2, sticky="w", **pad)
-        row += 1
-
-        # -- Genre ----------------------------------------------------------
-        self.genre_label = ttk.Label(frame, text="Genre:")
-        self.genre_label.grid(row=row, column=0, sticky="w", **pad)
-        self.genre_var = tk.StringVar(value="(random)")
-        genre_values = ["(random)"] + self.genres
-        self.genre_combo = ttk.Combobox(
-            frame, textvariable=self.genre_var, values=genre_values,
-            state="readonly", width=30,
-        )
-        self.genre_combo.grid(row=row, column=1, sticky="w", **pad)
-        self.genre_combo.bind("<<ComboboxSelected>>", lambda _: self._on_genre_change())
-        row += 1
-
-        # -- Key ------------------------------------------------------------
-        self.key_label = ttk.Label(frame, text="Key:")
-        self.key_label.grid(row=row, column=0, sticky="w", **pad)
-        self.key_var = tk.StringVar(value="(random)")
-        self.key_combo = ttk.Combobox(
-            frame, textvariable=self.key_var, values=["(random)"],
-            state="readonly", width=30,
-        )
-        self.key_combo.grid(row=row, column=1, sticky="w", **pad)
         row += 1
 
         # -- Separator: General options -------------------------------------
@@ -174,60 +110,6 @@ class LauncherApp:
         )
         row += 1
 
-        # -- Separator: Calibration -----------------------------------------
-        ttk.Separator(frame, orient="horizontal").grid(
-            row=row, column=0, columnspan=3, sticky="ew", pady=8,
-        )
-        row += 1
-
-        ttk.Label(frame, text="Calibration", font=("TkDefaultFont", 0, "bold")).grid(
-            row=row, column=0, columnspan=2, sticky="w", **pad,
-        )
-        row += 1
-
-        # Video list
-        ttk.Label(frame, text="Videos:").grid(row=row, column=0, sticky="nw", **pad)
-        cal_list_frame = ttk.Frame(frame)
-        cal_list_frame.grid(row=row, column=1, sticky="w", **pad)
-
-        self.cal_listbox = tk.Listbox(cal_list_frame, height=4, width=40, selectmode="extended")
-        self.cal_listbox.pack(side="left")
-
-        cal_btn_frame = ttk.Frame(cal_list_frame)
-        cal_btn_frame.pack(side="left", padx=(4, 0))
-        ttk.Button(cal_btn_frame, text="Add…", command=self._cal_add_videos, width=7).pack(pady=1)
-        ttk.Button(cal_btn_frame, text="Remove", command=self._cal_remove_videos, width=7).pack(pady=1)
-        row += 1
-
-        # Label selector
-        ttk.Label(frame, text="Label:").grid(row=row, column=0, sticky="w", **pad)
-        label_frame = ttk.Frame(frame)
-        label_frame.grid(row=row, column=1, sticky="w", **pad)
-        self.cal_label_var = tk.StringVar(value="full_body")
-        ttk.Combobox(
-            label_frame, textvariable=self.cal_label_var,
-            values=["still", "slow_arms", "fast_arms", "pelvis", "lean", "full_body"],
-            state="readonly", width=14,
-        ).pack(side="left")
-        ttk.Button(label_frame, text="Set label", command=self._cal_set_label, width=8).pack(
-            side="left", padx=(4, 0),
-        )
-        row += 1
-
-        # Apply checkbox + Run button
-        cal_run_frame = ttk.Frame(frame)
-        cal_run_frame.grid(row=row, column=0, columnspan=2, sticky="w", **pad)
-        self.cal_apply_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(cal_run_frame, text="Apply to config.yaml", variable=self.cal_apply_var).pack(
-            side="left",
-        )
-        self.cal_run_btn = ttk.Button(cal_run_frame, text="Run Calibration", command=self._cal_run)
-        self.cal_run_btn.pack(side="left", padx=(12, 0))
-        row += 1
-
-        # Internal: label mapping {path: label}
-        self._cal_labels: dict[str, str] = {}
-
         # -- Separator ------------------------------------------------------
         ttk.Separator(frame, orient="horizontal").grid(
             row=row, column=0, columnspan=3, sticky="ew", pady=8,
@@ -251,8 +133,8 @@ class LauncherApp:
         self.stop_btn.pack(side="left", padx=4)
 
         # Trace variables to update command preview
-        for var in (self.mode_var, self.midi_mode_var, self.genre_var,
-                    self.key_var, self.backend_var, self.source_var, self.debug_var):
+        for var in (self.mode_var, self.midi_mode_var, self.backend_var,
+                    self.source_var, self.debug_var):
             var.trace_add("write", lambda *_: self._update_cmd_preview())
 
         self._update_cmd_preview()
@@ -263,24 +145,6 @@ class LauncherApp:
         is_midi = self.mode_var.get() == "midi"
         state = "readonly" if is_midi else "disabled"
         self.midi_mode_combo.configure(state=state)
-        self._on_midi_mode_change()
-
-    def _on_midi_mode_change(self):
-        show_bp = (self.mode_var.get() == "midi" and self.midi_mode_var.get() == "blueprint")
-        state = "readonly" if show_bp else "disabled"
-        self.genre_combo.configure(state=state)
-        self.key_combo.configure(state=state)
-        self._update_cmd_preview()
-
-    def _on_genre_change(self):
-        genre = self.genre_var.get()
-        if genre == "(random)":
-            self.key_combo.configure(values=["(random)"])
-            self.key_var.set("(random)")
-        else:
-            keys = _scan_keys(genre)
-            self.key_combo.configure(values=["(random)"] + keys)
-            self.key_var.set("(random)")
         self._update_cmd_preview()
 
     def _browse_source(self):
@@ -300,16 +164,6 @@ class LauncherApp:
 
         if self.mode_var.get() == "midi":
             cmd.extend(["--midi-mode", self.midi_mode_var.get()])
-
-            if self.midi_mode_var.get() == "blueprint":
-                genre = self.genre_var.get()
-                if genre != "(random)":
-                    cmd.extend(["--genre", genre])
-                key = self.key_var.get()
-                if key != "(random)":
-                    # Extract just the major key part, e.g. "C Major" from "C Major - A Minor"
-                    key_name = key.split(" - ")[0].strip() if " - " in key else key
-                    cmd.extend(["--key", key_name])
 
         backend = self.backend_var.get()
         if backend != "auto":
@@ -356,61 +210,6 @@ class LauncherApp:
             self._reset_buttons()
         else:
             self.root.after(500, self._poll_process)
-
-    # -- Calibration -------------------------------------------------------
-
-    def _cal_add_videos(self):
-        paths = filedialog.askopenfilenames(
-            title="Select calibration videos",
-            filetypes=[("Video files", "*.mp4 *.avi *.mov *.mkv"), ("All files", "*.*")],
-        )
-        for p in paths:
-            if p not in self._cal_labels:
-                label = self.cal_label_var.get()
-                self._cal_labels[p] = label
-                self.cal_listbox.insert("end", f"[{label}] {os.path.basename(p)}")
-
-    def _cal_remove_videos(self):
-        selected = list(self.cal_listbox.curselection())
-        paths = list(self._cal_labels.keys())
-        for idx in reversed(selected):
-            if idx < len(paths):
-                del self._cal_labels[paths[idx]]
-            self.cal_listbox.delete(idx)
-
-    def _cal_set_label(self):
-        selected = list(self.cal_listbox.curselection())
-        paths = list(self._cal_labels.keys())
-        new_label = self.cal_label_var.get()
-        for idx in selected:
-            if idx < len(paths):
-                path = paths[idx]
-                self._cal_labels[path] = new_label
-                self.cal_listbox.delete(idx)
-                self.cal_listbox.insert(idx, f"[{new_label}] {os.path.basename(path)}")
-
-    def _cal_run(self):
-        if not self._cal_labels:
-            return
-
-        cmd = [sys.executable, CALIBRATE_SCRIPT]
-
-        if self.cal_apply_var.get():
-            cmd.append("--apply")
-
-        for path, label in self._cal_labels.items():
-            cmd.extend(["--label", label, path])
-
-        self.cal_run_btn.configure(state="disabled")
-        self.process = subprocess.Popen(cmd, cwd=ROOT_DIR)
-        self._poll_calibration()
-
-    def _poll_calibration(self):
-        if self.process and self.process.poll() is not None:
-            self.cal_run_btn.configure(state="normal")
-            self.process = None
-        else:
-            self.root.after(500, self._poll_calibration)
 
     def _reset_buttons(self):
         self.launch_btn.configure(state="normal")

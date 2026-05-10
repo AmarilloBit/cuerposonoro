@@ -23,13 +23,11 @@ import time
 from pathlib import Path
 from typing import Optional
 
+import logging
+
 import cv2
 
-# Permitir imports desde la raíz del proyecto
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from vision_processor.config import Config
-from vision_processor.features import FeatureExtractor
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -209,7 +207,7 @@ class InstrumentedMusicalSender:
         self.events        = []
         self.current_chord = None
         self._melody_index = 2
-        self._prev_hand_y: Optional[float] = None
+        self.prev_hand_y: Optional[float] = None
         self._frame = 0
         self._time  = 0.0
 
@@ -252,12 +250,12 @@ class InstrumentedMusicalSender:
         hand_y       = features.get("rightHandY", 0.5)
         arm_velocity = features.get("rightArmVelocity", 0.0)
 
-        if self._prev_hand_y is None:
-            self._prev_hand_y = hand_y
+        if self.prev_hand_y is None:
+            self.prev_hand_y = hand_y
             return
 
-        dy = hand_y - self._prev_hand_y
-        self._prev_hand_y = hand_y
+        dy = hand_y - self.prev_hand_y
+        self.prev_hand_y = hand_y
 
         jump = self.jump_size_fast if arm_velocity > self.velocity_threshold else self.jump_size_slow
 
@@ -305,12 +303,16 @@ FEATURE_KEYS = [
     "headTilt",
 ]
 
-JERK_THRESHOLD      = 0.4   # Aligned with classic.py and config.yaml (midi.jerk_threshold)
-DIRECTION_THRESHOLD = 0.03
-VELOCITY_THRESHOLD  = 0.4
+# Default thresholds — used only as fallbacks outside analyze().
+# Inside analyze(), values are read from Config.
+_DEFAULT_JERK_THRESHOLD      = 0.4
+_DEFAULT_DIRECTION_THRESHOLD = 0.03
 
 
 def analyze(source: str, midi_mode: str, output_dir: str):
+    from vision_processor.config import Config
+    from vision_processor.features import FeatureExtractor
+
     os.makedirs(output_dir, exist_ok=True)
 
     # Pipeline
@@ -332,23 +334,23 @@ def analyze(source: str, midi_mode: str, output_dir: str):
         sender = InstrumentedClassicSender()
         sender.JERK_THRESHOLD = config.midi_jerk_threshold
 
-    # Syncro global umbrals
-    global JERK_THRESHOLD, DIRECTION_THRESHOLD
-    JERK_THRESHOLD      = config.midi_jerk_threshold
-    DIRECTION_THRESHOLD = config.musical_direction_threshold
+    # Threshold values from config (local to this call)
+    jerk_threshold      = config.midi_jerk_threshold
+    direction_threshold = config.musical_direction_threshold
+    velocity_threshold  = config.musical_velocity_threshold
 
     # Abrir vídeo (una sola pasada, sin loop)
     cap = cv2.VideoCapture(source)
     if not cap.isOpened():
-        print(f"[ERROR] No se puede abrir el vídeo: {source}")
+        logger.error("Cannot open video: %s", source)
         sys.exit(1)
 
     fps_video  = cap.get(cv2.CAP_PROP_FPS) or 30.0
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print(f"[analyze] Vídeo: {source}")
-    print(f"[analyze] FPS: {fps_video:.1f}  |  Fotogramas totales: {total_frames}")
-    print(f"[analyze] Modo MIDI: {midi_mode}")
-    print(f"[analyze] Procesando...")
+    logger.info("Video: %s", source)
+    logger.info("FPS: %.1f  |  Total frames: %d", fps_video, total_frames)
+    logger.info("MIDI mode: %s", midi_mode)
+    logger.info("Processing...")
 
     all_features  = []   # una fila por fotograma
     all_triggers  = []   # solo fotogramas con eventos relevantes
@@ -386,14 +388,14 @@ def analyze(source: str, midi_mode: str, output_dir: str):
 
         # --- Detectar triggers manualmente para triggers.csv ---
         trigger_notes = []
-        if features.get("rightHandJerk", 0) > JERK_THRESHOLD:
+        if features.get("rightHandJerk", 0) > jerk_threshold:
             trigger_notes.append({"side": "right",
                                    "jerk": round(features["rightHandJerk"], 4),
-                                   "threshold": JERK_THRESHOLD})
-        if features.get("leftHandJerk", 0) > JERK_THRESHOLD:
+                                   "threshold": jerk_threshold})
+        if features.get("leftHandJerk", 0) > jerk_threshold:
             trigger_notes.append({"side": "left",
                                    "jerk": round(features["leftHandJerk"], 4),
-                                   "threshold": JERK_THRESHOLD})
+                                   "threshold": jerk_threshold})
 
         for t in trigger_notes:
             all_triggers.append({
@@ -407,16 +409,16 @@ def analyze(source: str, midi_mode: str, output_dir: str):
             })
 
         # Triggers de dirección para musical
-        if midi_mode == "musical" and sender._prev_hand_y is not None:
-            dy = features.get("rightHandY", 0.5) - sender._prev_hand_y
-            if abs(dy) > DIRECTION_THRESHOLD:
+        if midi_mode == "musical" and sender.prev_hand_y is not None:
+            dy = features.get("rightHandY", 0.5) - sender.prev_hand_y
+            if abs(dy) > direction_threshold:
                 all_triggers.append({
                     "frame":        frame_idx,
                     "time_s":       round(timestamp, 4),
                     "trigger_type": "direction",
                     "side":         "right",
                     "dy":           round(dy, 5),
-                    "threshold":    DIRECTION_THRESHOLD,
+                    "threshold":    direction_threshold,
                     "rightHandY":   round(features.get("rightHandY", 0), 4),
                     "arm_velocity": round(features.get("rightArmVelocity", 0), 4),
                 })
@@ -426,11 +428,11 @@ def analyze(source: str, midi_mode: str, output_dir: str):
 
         frame_idx += 1
         if frame_idx % 50 == 0:
-            print(f"  {frame_idx}/{total_frames} fotogramas procesados...", end="\r")
+            logger.info("  %d/%d frames processed...", frame_idx, total_frames)
 
     cap.release()
     pose_estimator.release()
-    print(f"\n[analyze] {frame_idx} fotogramas procesados.")
+    logger.info("%d frames processed.", frame_idx)
 
     # ==========================================================================
     # Guardar CSVs
@@ -443,7 +445,7 @@ def analyze(source: str, midi_mode: str, output_dir: str):
             writer = csv.DictWriter(f, fieldnames=list(all_features[0].keys()))
             writer.writeheader()
             writer.writerows(all_features)
-    print(f"[analyze] Guardado: {features_path}  ({len(all_features)} filas)")
+    logger.info("Saved: %s  (%d rows)", features_path, len(all_features))
 
     # 2. triggers.csv
     triggers_path = os.path.join(output_dir, "triggers.csv")
@@ -454,7 +456,7 @@ def analyze(source: str, midi_mode: str, output_dir: str):
         writer = csv.DictWriter(f, fieldnames=trigger_fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(all_triggers)
-    print(f"[analyze] Guardado: {triggers_path}  ({len(all_triggers)} triggers)")
+    logger.info("Saved: %s  (%d triggers)", triggers_path, len(all_triggers))
 
     # 3. midi_events.csv
     midi_path = os.path.join(output_dir, "midi_events.csv")
@@ -466,7 +468,7 @@ def analyze(source: str, midi_mode: str, output_dir: str):
         writer = csv.DictWriter(f, fieldnames=midi_fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(sender.events)
-    print(f"[analyze] Guardado: {midi_path}  ({len(sender.events)} eventos MIDI)")
+    logger.info("Saved: %s  (%d MIDI events)", midi_path, len(sender.events))
 
     # ==========================================================================
     # summary.json
@@ -504,9 +506,9 @@ def analyze(source: str, midi_mode: str, output_dir: str):
         "poses_detected":   sum(1 for r in all_features if r["pose_detected"]),
         "poses_missed":     sum(1 for r in all_features if not r["pose_detected"]),
         "thresholds": {
-            "jerk":      JERK_THRESHOLD,
-            "direction": DIRECTION_THRESHOLD,
-            "velocity":  VELOCITY_THRESHOLD,
+            "jerk":      jerk_threshold,
+            "direction": direction_threshold,
+            "velocity":  velocity_threshold,
         },
         "trigger_count":    len(all_triggers),
         "midi_event_count": len(sender.events),
@@ -523,23 +525,23 @@ def analyze(source: str, midi_mode: str, output_dir: str):
     summary_path = os.path.join(output_dir, "summary.json")
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
-    print(f"[analyze] Guardado: {summary_path}")
+    logger.info("Saved: %s", summary_path)
 
-    # Resumen en consola
+    # Human-readable console summary (intentionally print, not logging)
     print("\n" + "=" * 60)
-    print(f"  RESUMEN — {midi_mode.upper()}")
+    print(f"  SUMMARY — {midi_mode.upper()}")
     print("=" * 60)
-    print(f"  Fotogramas procesados : {frame_idx}")
-    print(f"  Pose detectada        : {summary['poses_detected']} / {frame_idx}")
-    print(f"  Triggers detectados   : {len(all_triggers)}")
-    print(f"  Eventos MIDI          : {len(sender.events)}")
-    print(f"  Cambios de acorde     : {sum(chord_counts.values())}")
-    print(f"  Notas disparadas      : {sum(note_counts.values())}")
-    print(f"\n  Jerk máximo derecha   : {feature_stats['rightHandJerk']['max']:.4f}  (umbral: {JERK_THRESHOLD})")
-    print(f"  Jerk máximo izquierda : {feature_stats['leftHandJerk']['max']:.4f}  (umbral: {JERK_THRESHOLD})")
-    print(f"  Velocidad brazo (máx) : {feature_stats['rightArmVelocity']['max']:.4f}")
+    print(f"  Frames processed      : {frame_idx}")
+    print(f"  Pose detected         : {summary['poses_detected']} / {frame_idx}")
+    print(f"  Triggers detected     : {len(all_triggers)}")
+    print(f"  MIDI events           : {len(sender.events)}")
+    print(f"  Chord changes         : {sum(chord_counts.values())}")
+    print(f"  Notes fired           : {sum(note_counts.values())}")
+    print(f"\n  Max jerk (right)      : {feature_stats['rightHandJerk']['max']:.4f}  (threshold: {jerk_threshold})")
+    print(f"  Max jerk (left)       : {feature_stats['leftHandJerk']['max']:.4f}  (threshold: {jerk_threshold})")
+    print(f"  Max arm velocity      : {feature_stats['rightArmVelocity']['max']:.4f}")
     print("=" * 60)
-    print(f"\n  Archivos en: {output_dir}/\n")
+    print(f"\n  Output in: {output_dir}/\n")
 
     return summary
 
@@ -563,6 +565,12 @@ def _parse_args():
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(name)s] %(message)s",
+    )
+
     args = _parse_args()
 
     if args.out:

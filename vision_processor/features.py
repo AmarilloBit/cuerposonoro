@@ -15,6 +15,7 @@ from typing import Optional
 
 NO_SMOOTH = {"rightHandJerk", "leftHandJerk", "rightArmVelocity", "leftArmVelocity"}
 
+
 class FeatureExtractor:
     """Extracts musical features from MediaPipe pose landmarks."""
 

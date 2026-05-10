@@ -26,18 +26,19 @@ Cuerpo Sonoro captures human body movement through computer vision and translate
   - [Prerequisites](#prerequisites)
   - [Local Installation](#local-installation)
   - [Running the System](#running-the-system)
+  - [Launcher (GUI)](#launcher-gui)
 - [Installation](#installation)
   - [macOS](#macos)
   - [Linux (Ubuntu / Debian)](#linux-ubuntu--debian)
   - [NVIDIA Jetson (Orin Nano)](#nvidia-jetson-orin-nano)
   - [Running modes](#running-modes)
   - [Running tests (no hardware required)](#running-tests-no-hardware-required)
+- [Configuration](#configuration)
+- [Debug Tools](#debug-tools)
 - [Web Demo](#web-demo)
-- [Performance Targets](#performance-targets)
 - [Testing](#testing)
 - [Benchmarks](#benchmarks)
 - [Deployment](#deployment)
-- [Future Work](#future-work)
 - [Academic Context](#academic-context)
 - [License](#license)
 - [Author](#author)
@@ -233,7 +234,7 @@ cuerposonoro/
 │   │   ├── cpu.py              # CPUPoseEstimator — MediaPipe on CPU (any machine)
 │   │   ├── metal.py            # MetalPoseEstimator — MediaPipe + Metal GPU (Mac Apple Silicon)
 │   │   └── tensorrt.py         # TensorRTPoseEstimator — stub (GPU path not viable, see docs)
-│   ├── features.py             # Motion feature extraction (19 features)
+│   ├── features.py             # Motion feature extraction (17 features)
 │   ├── osc_sender.py           # OSC communication to SuperCollider
 │   ├── midi/                   # MIDI sender strategy pattern
 │   │   ├── base.py             # BaseMidiSender abstract interface
@@ -242,14 +243,18 @@ cuerposonoro/
 │   ├── midi_sender.py          # Backward-compatible alias → ClassicMidiSender
 │   ├── config.py               # Centralized config loader with factory methods
 │   └── latency_logger.py       # Per-stage latency instrumentation
-├── audio_engine/               # SuperCollider audio synthesis
-│   └── ...
-├── supercollider/              # SuperCollider SynthDef files
-│   └── ...
+├── audio_engine/
+│   └── synths.scd              # SuperCollider SynthDef (`bodySound`) consumed by the OSC pipeline
+├── supercollider/
+│   └── introduction-to-sc.scd  # Standalone SC snippets used during sound design
+├── debug_tools/                # Offline analysis utilities (see Debug Tools section)
+│   ├── analyze_video.py        # Headless run that emits CSV/JSON for a video file
+│   └── debug_output/           # Per-video output folders (gitignored)
 ├── tests/
 │   ├── unit/                   # Automated unit tests (pytest)
 │   │   ├── test_features.py
-│   │   └── test_backends.py    # CPU & Metal backends, BasePoseEstimator, _detect_backend
+│   │   ├── test_config.py
+│   │   └── test_musical.py
 │   ├── integration/            # Automated integration tests (pytest)
 │   │   └── test_integration.py
 │   └── manual/                 # Interactive scripts (require hardware)
@@ -261,16 +266,24 @@ cuerposonoro/
 │       ├── manual_e2e_osc.py
 │       └── manual_e2e_midi_debug.py
 ├── benchmarks/                 # Latency benchmarking system
-│   ├── README.md               # Full documentation with results
-│   ├── run_benchmark.py        # Automated benchmark runner
-│   ├── analyze_results.py      # Analysis with pandas + matplotlib
-│   ├── results/                # Session-organized CSV data (gitignored)
-│   └── charts/                 # Generated charts and screenshots (gitignored)
-├── logs/                       # Session logs (CSV) for analysis
-├── main.py                     # Application entry point
-├── config.yaml                 # Centralized configuration
-├── requirements.in             # Top-level dependencies
-├── requirements.txt            # Pinned dependencies (pip-tools)
+│   ├── README.md               # Full methodology, environments and results
+│   ├── run_benchmark.py        # Iterates the matrix defined in `config.yaml -> benchmark`
+│   ├── analyze_results.py      # Aggregation and chart generation (pandas + matplotlib)
+│   ├── benchmark_results_tfg/  # Canonical TFG results (committed)
+│   ├── results/                # Session CSVs from local runs (gitignored)
+│   └── charts/                 # Generated charts (gitignored)
+├── assets/                     # Static resources
+│   ├── pose_landmarker_full.task   # MediaPipe Pose model file (gitignored)
+│   ├── silueta-chelo*.af           # Calibration silhouettes used during installation setup
+│   ├── video-calibration/          # Sample videos for `analyze_video.py` (large, local-only)
+│   └── *.jpeg / *.JPG              # Photographic references of the physical installation
+├── memoria-tfg/                # Compiled PDF of the academic memoria
+├── logs/                       # Per-session latency logs written by `latency_logger.py`
+├── main.py                     # CLI entry point of the pipeline
+├── launcher.py                 # Tkinter GUI that spawns `main.py` with chosen flags
+├── config.yaml                 # Centralized configuration (see Configuration section)
+├── requirements.in             # Top-level dependencies (pip-tools source)
+├── requirements.txt            # Pinned dependencies (pip-tools output)
 ├── LICENSE
 └── README.md
 ```
@@ -308,9 +321,11 @@ pip install -r requirements.txt
 
 3. **Configure the system:**
 
-Edit `config.yaml` to adjust camera settings, OSC ports, feature parameters, and more.
+Edit `config.yaml` to adjust camera settings, OSC ports, feature parameters, and more. See [Configuration](#configuration) below for an overview of each section.
 
 ### Running the System
+
+There are two equivalent ways to run the pipeline: directly with `main.py` (CLI) or through the bundled GUI launcher (`launcher.py`).
 
 **With SuperCollider (OSC mode):**
 
@@ -324,16 +339,35 @@ python main.py
 python main.py --mode midi
 ```
 
-**CLI flags:**
+**CLI flags (`main.py`):**
 
 | Flag | Description |
 |------|-------------|
 | *(none)* | Live webcam, output mode from `config.yaml` |
-| `--backend cpu\|metal` | Override pose estimation backend |
-| `--source PATH` | Use a video file instead of webcam |
-| `--debug` | Show feature values and skeleton overlay |
-| `--mode osc\|midi` | Override output mode |
-| `--midi-mode classic\|musical` | Override MIDI mode |
+| `--backend cpu\|metal\|tensorrt` | Override pose estimation backend (default: auto-detect) |
+| `--source PATH` | Use a video file instead of the live webcam |
+| `--debug` | Show feature values and skeleton overlay on the video window |
+| `--mode osc\|midi` | Override `output.mode` from `config.yaml` |
+| `--midi-mode classic\|musical` | Override `output.midi_mode` (only used when `--mode midi`) |
+
+### Launcher (GUI)
+
+`launcher.py` is a small tkinter application that lets you configure the run without remembering CLI flags. It is intended for live performance and demos where the operator may not be the developer.
+
+```bash
+python launcher.py
+```
+
+The launcher exposes:
+
+- **Output mode** — `osc` (SuperCollider) or `midi` (Surge XT).
+- **MIDI mode** — `classic` or `musical` (only shown when `output mode = midi`).
+- **Backend** — `auto`, `cpu`, `metal` or `tensorrt` (the latter is a stub and not active in production; see [GPU backend investigation](#gpu-backend-investigation-jetson)).
+- **Source** — live webcam or a video file picked through a file dialog.
+- **Debug overlay** — toggles the feature/skeleton overlay on the video window.
+- **Start / Stop** — spawns and terminates `main.py` as a subprocess and streams its stdout into the launcher window.
+
+The launcher writes nothing to disk; all changes apply only to the spawned process. Persistent defaults still live in `config.yaml`.
 
 ---
 
@@ -403,6 +437,51 @@ All tests run without a camera or synthesizer connected.
 
 ---
 
+## Configuration
+
+Every runtime parameter lives in `config.yaml` at the repo root. CLI flags only override a small subset; the rest must be edited in the file. The schema is loaded by `vision_processor/config.py`, which exposes a `Config` class with factory methods for each pipeline component.
+
+| Section | What it controls |
+|---------|------------------|
+| `camera` | Device id, capture resolution, FPS, capture buffer size |
+| `camera_profiles` | Named device-id presets used by the benchmark runner |
+| `pose` | MediaPipe model complexity (Lite/Full/Heavy) and detection/tracking thresholds |
+| `features` | Exponential-smoothing factor applied to feature values |
+| `output` | `mode` (`osc` or `midi`) and, for MIDI, `midi_mode` (`classic` or `musical`) |
+| `osc` | SuperCollider host/port and `send_mode` (`individual` or `bundle`) |
+| `midi` | Virtual port name, jerk threshold and note-duration envelope |
+| `audio` | Active SuperCollider and Surge XT presets (currently a documentation placeholder) |
+| `benchmark` | Matrix of resolutions, models, output modes and backends iterated by `run_benchmark.py` |
+
+To override values from code or scripts:
+
+```python
+from vision_processor.config import Config
+config = Config(overrides={"camera.device_id": 1, "pose.model_complexity": 0})
+```
+
+---
+
+## Debug Tools
+
+`debug_tools/analyze_video.py` is a headless analyser for offline inspection. It runs the full pipeline on a video file without opening any window or sending real OSC/MIDI, and writes:
+
+- `features_frame_by_frame.csv` — every feature value at every frame
+- `triggers.csv` — frames where thresholds (jerk, chord changes, etc.) were crossed
+- `midi_events.csv` — the MIDI notes the system would have sent
+- `summary.json` — aggregated statistics over the whole run
+
+Typical usage while iterating on thresholds or new sensor mappings:
+
+```bash
+python debug_tools/analyze_video.py --source assets/video-calibration/test-debug-1.mov --midi-mode classic
+python debug_tools/analyze_video.py --source path/to/video.mov --midi-mode musical --out debug_tools/debug_output/my-session/
+```
+
+Output goes to `debug_tools/debug_output/<video_stem>/` by default. That directory is gitignored.
+
+---
+
 ## Web Demo
 
 A browser-based version is deployed at **[cuerposonoro.art](https://cuerposonoro.art)**, allowing anyone with a webcam to experience the installation without any software installation.
@@ -426,9 +505,9 @@ A browser-based version is deployed at **[cuerposonoro.art](https://cuerposonoro
 ## Testing
 
 ```bash
-pytest tests/ -v                          # all automated (168 tests)
-pytest tests/unit/ -v                     # unit tests only (119 tests)
-pytest tests/integration/ -v              # integration tests only (~50 tests)
+pytest tests/ -v                          # all automated (204 tests)
+pytest tests/unit/ -v                     # unit tests only (155 tests)
+pytest tests/integration/ -v              # integration tests only (49 tests)
 ```
 
 Manual tests (require hardware):
